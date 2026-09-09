@@ -1,0 +1,7 @@
+unity/DRON/Assets/yeouido63/**/*.fbx filter=lfs diff=lfs merge=lfs -text
+unity/DRON/Assets/yeouido63/**/*.hdr filter=lfs diff=lfs merge=lfs -text
+unity/DRON/Assets/yeouido63/**/*.exr filter=lfs diff=lfs merge=lfs -text
+unity/DRON/Assets/yeouido63/**/*.png filter=lfs diff=lfs merge=lfs -text
+unity/DRON/Assets/yeouido63/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+unity/DRON/Assets/yeouido63/**/*.tga filter=lfs diff=lfs merge=lfs -text
+unity/DRON/Assets/yeouido63/**/*.psd filter=lfs diff=lfs merge=lfs -text

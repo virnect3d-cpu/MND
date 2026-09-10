@@ -14,7 +14,9 @@ using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
-[InitializeOnLoad]
+// NOTE: deliberately NOT [InitializeOnLoad]. Run() re-instantiates the rooftop FBX,
+// which destroys every material assignment on it. Auto-running that on each domain
+// reload would silently wipe hand edits. Menu-driven only.
 public static class _TempRenderCheck
 {
     const string ScenePath  = "Assets/yeouido63/Scenes/Yeouido63.unity";
@@ -28,26 +30,7 @@ public static class _TempRenderCheck
     const int    TexCap     = 2048;
     const float  SunFov     = 60f;
 
-    static int _frames;
-
-    static _TempRenderCheck()
-    {
-        if (SessionState.GetBool(RanKey, false)) return;
-        EditorApplication.update += Tick;
-    }
-
-    static void Tick()
-    {
-        // let the editor finish whatever import triggered this reload
-        if (EditorApplication.isCompiling || EditorApplication.isUpdating) { _frames = 0; return; }
-        if (++_frames < 30) return;
-
-        EditorApplication.update -= Tick;
-        SessionState.SetBool(RanKey, true);
-        Run();
-    }
-
-    [MenuItem("Tools/_Temp/Run Setup And Capture")]
+    [MenuItem("Tools/_Temp/Run Setup And Capture (DESTRUCTIVE - re-imports FBX)")]
     public static void Run()
     {
         try

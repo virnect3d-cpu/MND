@@ -8,28 +8,13 @@ using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
-[InitializeOnLoad]
+// NOTE: deliberately NOT [InitializeOnLoad]. An auto-running script that rewrites
+// scene materials and saves the scene will silently undo hand edits on every domain
+// reload - which is exactly how the 63 cap material got wiped. Menu-driven only.
 public static class _TempSunCalib
 {
-    const string RanKey  = "_TempSunCalib.ran.v2";
     const string RoofDir = "Assets/yeouido63/Runtime/Models/63_RoofTop";
     const int    Res     = 256;
-    static int _frames;
-
-    static _TempSunCalib()
-    {
-        if (SessionState.GetBool(RanKey, false)) return;
-        EditorApplication.update += Tick;
-    }
-
-    static void Tick()
-    {
-        if (EditorApplication.isCompiling || EditorApplication.isUpdating) { _frames = 0; return; }
-        if (++_frames < 30) return;
-        EditorApplication.update -= Tick;
-        SessionState.SetBool(RanKey, true);
-        Run();
-    }
 
     [MenuItem("Tools/_Temp/Fix Materials And Calibrate Sun")]
     public static void Run()
@@ -117,39 +102,11 @@ public static class _TempSunCalib
         Debug.Log("[CAP] target = " + go.name + " (submeshes=" + mf.sharedMesh.subMeshCount + ")");
         var mesh = mf.sharedMesh;
 
-        // pick the submesh whose vertices sit highest -> that is the cap
-        int capIndex = -1; float bestMinY = float.MinValue;
-        var verts = mesh.vertices;
-        for (int s = 0; s < mesh.subMeshCount; s++)
-        {
-            float minY = float.MaxValue;
-            foreach (var idx in mesh.GetTriangles(s))
-            {
-                float y = go.transform.TransformPoint(verts[idx]).y;
-                if (y < minY) minY = y;
-            }
-            if (minY > bestMinY) { bestMinY = minY; capIndex = s; }
-        }
+        int capIndex = FindCapSubmesh(go, mesh);
         if (capIndex < 0) { Debug.LogError("[CAP] could not determine cap submesh"); return; }
-
-        string path = RoofDir + "/M_63_Cap.mat";
-        var cap = AssetDatabase.LoadAssetAtPath<Material>(path);
-        if (cap == null)
-        {
-            cap = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            AssetDatabase.CreateAsset(cap, path);
-        }
-        // dark, matte roof deck - deliberately unlike the mirrored gold wall
-        var baseTex = Tex("Roof_Top_blinn2_BaseColor");
-        var nrmTex  = Tex("Roof_Top_blinn2_Normal");
-        if (baseTex != null) cap.SetTexture("_BaseMap", baseTex);
-        if (nrmTex  != null) { cap.SetTexture("_BumpMap", nrmTex); cap.EnableKeyword("_NORMALMAP"); }
-        cap.SetColor("_BaseColor", new Color(0.32f, 0.33f, 0.34f, 1f));
-        cap.SetFloat("_Metallic", 0f);
-        cap.SetFloat("_Smoothness", 0.25f);
-        cap.SetFloat("_SmoothnessTextureChannel", 1f);
-        EditorUtility.SetDirty(cap);
+        var cap = CapMaterial();
         AssetDatabase.SaveAssets();
+        float bestMinY = float.NaN;
 
         var mats = r.sharedMaterials;
         if (mats.Length < mesh.subMeshCount) System.Array.Resize(ref mats, mesh.subMeshCount);
@@ -218,6 +175,47 @@ public static class _TempSunCalib
         return m;
     }
 
+    // The cap is the submesh sitting highest in world space.
+    static int FindCapSubmesh(GameObject go, Mesh mesh)
+    {
+        int capIndex = -1;
+        float bestMinY = float.MinValue;
+        var verts = mesh.vertices;
+        for (int s = 0; s < mesh.subMeshCount; s++)
+        {
+            float minY = float.MaxValue;
+            foreach (var idx in mesh.GetTriangles(s))
+            {
+                float y = go.transform.TransformPoint(verts[idx]).y;
+                if (y < minY) minY = y;
+            }
+            if (minY > bestMinY) { bestMinY = minY; capIndex = s; }
+        }
+        return capIndex;
+    }
+
+    // Matte roof deck, deliberately unlike the mirrored gold curtain wall.
+    static Material CapMaterial()
+    {
+        string path = RoofDir + "/M_63_Cap.mat";
+        var cap = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (cap == null)
+        {
+            cap = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            AssetDatabase.CreateAsset(cap, path);
+        }
+        var baseTex = Tex("Roof_Top_blinn2_BaseColor");
+        var nrmTex  = Tex("Roof_Top_blinn2_Normal");
+        if (baseTex != null) cap.SetTexture("_BaseMap", baseTex);
+        if (nrmTex  != null) { cap.SetTexture("_BumpMap", nrmTex); cap.EnableKeyword("_NORMALMAP"); }
+        cap.SetColor("_BaseColor", new Color(0.32f, 0.33f, 0.34f, 1f));
+        cap.SetFloat("_Metallic", 0f);
+        cap.SetFloat("_Smoothness", 0.25f);
+        cap.SetFloat("_SmoothnessTextureChannel", 1f);
+        EditorUtility.SetDirty(cap);
+        return cap;
+    }
+
     static void FixMaterials()
     {
         var root = GameObject.Find("63_RoofTop_ALL");
@@ -243,6 +241,20 @@ public static class _TempSunCalib
 
             var mats = r.sharedMaterials;
             for (int i = 0; i < mats.Length; i++) mats[i] = pick;
+
+            // the tower body's top cap keeps its own matte deck material - blanket
+            // assignment here is what previously wiped it
+            var mfr = r.GetComponent<MeshFilter>();
+            if (mfr != null && mfr.sharedMesh != null && mfr.sharedMesh.subMeshCount > 1)
+            {
+                int cap = FindCapSubmesh(r.gameObject, mfr.sharedMesh);
+                if (cap >= 0 && cap < mats.Length)
+                {
+                    mats[cap] = CapMaterial();
+                    Debug.Log("[CALIB] " + r.name + " submesh " + cap + " preserved as cap -> M_63_Cap");
+                }
+            }
+
             r.sharedMaterials = mats;
             Debug.Log("[CALIB] " + r.name + " -> " + pick.name + " (x" + mats.Length + ")");
         }

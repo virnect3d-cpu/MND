@@ -14,10 +14,10 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
-  m_Fog: 0
-  m_FogColor: {r: 0.62, g: 0.68, b: 0.74, a: 1}
+  m_Fog: 1
+  m_FogColor: {r: 0.58, g: 0.65, b: 0.72, a: 1}
   m_FogMode: 3
-  m_FogDensity: 0.00035
+  m_FogDensity: 0.00012
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
   m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
@@ -162,10 +162,10 @@ MonoBehaviour:
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
   m_RenderPostProcessing: 1
-  m_Antialiasing: 0
+  m_Antialiasing: 2
   m_AntialiasingQuality: 2
   m_StopNaN: 0
-  m_Dithering: 0
+  m_Dithering: 1
   m_ClearDepth: 1
   m_AllowXRRendering: 1
   m_AllowHDROutput: 1
@@ -256,6 +256,83 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &868407068
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -3252.3
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -79.4
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.6953539
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0.71866745
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: -91.889
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -7532478346410990271, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 31fe21fb4e32b8147b0ba7a75a4de389, type: 2}
+    - target: {fileID: -7532478346410990271, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 31fe21fb4e32b8147b0ba7a75a4de389, type: 2}
+    - target: {fileID: 523521382995744395, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 2ed283a2a7610a44cb4b280eb8776ef7, type: 2}
+    - target: {fileID: 623044252186788585, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 05fd9204f66a70f479c57b05544ec597, type: 2}
+    - target: {fileID: 919132149155446097, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: m_Name
+      value: 63_RoofTop_ALL
+      objectReference: {fileID: 0}
+    - target: {fileID: 4970587073390790491, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 31fe21fb4e32b8147b0ba7a75a4de389, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: beb6e1eee20cb33498b032a83f618ea5, type: 3}
 --- !u!1 &1315481746
 GameObject:
   m_ObjectHideFlags: 0
@@ -548,3 +625,4 @@ SceneRoots:
   - {fileID: 2047862685}
   - {fileID: 483357462}
   - {fileID: 1392986293}
+  - {fileID: 868407068}

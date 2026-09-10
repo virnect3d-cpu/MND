@@ -1,3 +1,32 @@
+# 텍스트는 체크아웃 시 OS 줄바꿈으로, 저장소엔 LF 로 정규화
+* text=auto
+
+# Unity YAML — 병합 도구가 붙어 있으면 씬/프리팹 3-way 머지에 씀
+*.unity      merge=unityyamlmerge eol=lf
+*.prefab     merge=unityyamlmerge eol=lf
+*.asset      merge=unityyamlmerge eol=lf
+*.mat        merge=unityyamlmerge eol=lf
+*.meta       merge=unityyamlmerge eol=lf
+*.controller merge=unityyamlmerge eol=lf
+*.anim       merge=unityyamlmerge eol=lf
+# 바이너리 (줄바꿈 변환 금지)
+*.fbx  binary
+*.obj  binary
+*.blend binary
+*.hdr  binary
+*.exr  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.tga  binary
+*.psd  binary
+*.wlt  binary
+*.dll  binary
+*.so   binary
+*.a    binary
+*.wav  binary
+*.mp3  binary
+*.mp4  binary
 unity/DRON/Assets/yeouido63/**/*.fbx filter=lfs diff=lfs merge=lfs -text
 unity/DRON/Assets/yeouido63/**/*.hdr filter=lfs diff=lfs merge=lfs -text
 unity/DRON/Assets/yeouido63/**/*.exr filter=lfs diff=lfs merge=lfs -text

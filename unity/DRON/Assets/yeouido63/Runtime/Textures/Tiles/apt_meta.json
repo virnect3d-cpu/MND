@@ -1,0 +1,107 @@
+{
+ "floor_m": 3.0,
+ "tiles": [
+  {
+   "file": "apt_0.png",
+   "src": "1183716_478176_238.jpg",
+   "px": [
+    788,
+    594
+   ],
+   "period": [
+    197,
+    198
+   ],
+   "floors": 3,
+   "size_m": [
+    11.94,
+    9.0
+   ]
+  },
+  {
+   "file": "apt_1.png",
+   "src": "images (1).jpg",
+   "px": [
+    192,
+    328
+   ],
+   "period": [
+    64,
+    41
+   ],
+   "floors": 8,
+   "size_m": [
+    14.05,
+    24.0
+   ]
+  },
+  {
+   "file": "apt_2.png",
+   "src": "images (2).jpg",
+   "px": [
+    357,
+    550
+   ],
+   "period": [
+    21,
+    110
+   ],
+   "floors": 5,
+   "size_m": [
+    9.74,
+    15.0
+   ]
+  },
+  {
+   "file": "apt_3.png",
+   "src": "images.jpg",
+   "px": [
+    546,
+    414
+   ],
+   "period": [
+    182,
+    69
+   ],
+   "floors": 6,
+   "size_m": [
+    23.74,
+    18.0
+   ]
+  },
+  {
+   "file": "apt_4.png",
+   "src": "SSI_20160919185956.jpg",
+   "px": [
+    870,
+    552
+   ],
+   "period": [
+    174,
+    92
+   ],
+   "floors": 6,
+   "size_m": [
+    28.37,
+    18.0
+   ]
+  },
+  {
+   "file": "apt_5.png",
+   "src": "thumb_d_B6384EE5FEE6E1C56556FA4F87283DE8.jpg",
+   "px": [
+    775,
+    260
+   ],
+   "period": [
+    155,
+    52
+   ],
+   "floors": 5,
+   "size_m": [
+    44.71,
+    15.0
+   ]
+  }
+ ]
+}

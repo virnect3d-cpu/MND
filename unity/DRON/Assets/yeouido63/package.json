@@ -1,0 +1,19 @@
+{
+  "name": "com.virnect.yeouido63",
+  "version": "0.1.0",
+  "displayName": "Yeouido 63 City",
+  "description": "여의도 63빌딩 일대 도시 에셋 (Blender -> Unity URP). FBX 도시 메쉬, 파사드 타일 텍스처, 구운 지형/바다 텍스처, HDRI 스카이, 씬 셋업 에디터 툴을 담고 있어요.",
+  "unity": "6000.0",
+  "keywords": [
+    "yeouido",
+    "city",
+    "urp",
+    "environment"
+  ],
+  "author": {
+    "name": "VIRNECT"
+  },
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.0"
+  }
+}

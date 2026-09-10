@@ -50,3 +50,13 @@ desktop.ini
 *.flag
 *.bak
 *.orig
+
+# ---- 로컬 개발 도구 (팀 저장소에 불필요) ----
+# MCP Unity 에디터 브리지: AI 도구가 에디터를 제어하기 위한 것.
+# 런타임/빌드와 무관하며 각자 로컬에 두면 된다.
+unity/DRON/Packages/com.gamelovers.mcp-unity/
+unity/DRON/ProjectSettings/McpUnitySettings.json
+
+# 임시 검증 스크립트 (_TempRenderCheck / _TempSunCalib).
+# 렌더샷 캡처·태양 정렬 측정용이며 씬을 수정하므로 배포본에 들어가면 안 된다.
+unity/DRON/Assets/Editor/_Temp*

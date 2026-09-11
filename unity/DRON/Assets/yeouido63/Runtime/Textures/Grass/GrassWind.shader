@@ -118,5 +118,9 @@ Shader "Yeouido63/GrassWind"
             ENDHLSL
         }
     }
-    FallBack "Universal Render Pipeline/Lit"
+    // 폴백을 두면 안 된다. URP Lit 을 폴백으로 걸었더니 머티리얼 생성 때마다
+    // "State comes from an incompatible keyword space" 경고와 함께 에디터가
+    // 스택을 덤프했다 — 이 패스가 선언한 multi_compile 키워드 공간과 Lit 의
+    // 것이 안 맞아서다. 이 셰이더는 URP 전용이라 폴백이 필요 없다.
+    Fallback Off
 }

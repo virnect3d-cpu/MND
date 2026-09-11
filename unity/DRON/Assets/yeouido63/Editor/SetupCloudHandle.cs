@@ -26,9 +26,9 @@ public static class SetupCloudHandle
     //   반대였다 — shapeOffset 은 카메라 거리와 무관하게 무늬를 미는 값이라
     //   원근 감쇠가 없다. 12 면 하늘 전체가 눈에 띄게 쓸려 간다.
     //
-    //   2.5 로 내렸는데도 빨랐다. 0.8 로 한 번 더 내린다.
-    //   10 분에 480 m — 한참 보고 있어야 움직인 게 보이는 정도다.
-    const float DriftSpeed  = 0.8f;
+    //   2.5 -> 0.8 -> 0.4. 10 분에 240 m 라 흐른다기보다 아주 천천히
+    //   밀려나는 정도다.
+    const float DriftSpeed  = 0.4f;
 
     // 제자리에서 굴러가는 속도(배율).
     //
@@ -36,9 +36,15 @@ public static class SetupCloudHandle
     //   구름이 여전히 빨라 보였다. globalSpeed 는 아래 두 배율을 곱하는데
     //   둘 다 1.0(상한)으로 올려 둔 상태라 실효 속도가 그대로였다.
     //
-    //   globalSpeed 7.5 -> 2.5 -> 0.6 으로 내리고, 배율도 같이 낮춘다.
+    //   globalSpeed 7.5 -> 2.5 -> 0.6 -> 0.3 으로 내렸다.
     //   셋이 곱해지므로 하나만 만지면 체감이 잘 안 바뀐다.
-    const float GlobalSpeed   = 0.6f;
+    //
+    //   한 번 더 절반으로 줄일 때는 globalSpeed 만 건드린다. 곱이라
+    //   실효가 정확히 반이 되고, 형상과 침식의 비율(0.35:0.25)도
+    //   그대로 유지돼 구름 결이 안 변한다.
+    //     형상 실효 0.21 -> 0.105
+    //     침식 실효 0.15 -> 0.075
+    const float GlobalSpeed   = 0.3f;
     const float ShapeSpeed    = 0.35f;   // 형상이 뭉개지는 속도
     const float ErosionSpeed  = 0.25f;   // 가장자리가 헐리는 속도
 

@@ -1,4 +1,4 @@
-// 황사 먼지 파티클 — 눈앞에 날리는 알갱이
+// 황사 먼지 파티클 — 3 층 레이어
 //
 // 메뉴: Tools/Yeouido 63/먼지 파티클 심기  /  먼지 파티클 제거
 //
@@ -7,9 +7,21 @@
 //   대비가 죽는 효과라 공간감은 주지만, 눈앞을 스쳐 지나가는 알갱이는 없다.
 //   황사의 체감은 그 알갱이에서 나온다.
 //
+// 왜 3 층인가
+//   단일 시스템으로는 "알갱이" 와 "자욱함" 을 동시에 못 낸다. 알갱이가
+//   보이게 키우면 눈송이가 되고, 자욱하게 만들려고 알파를 올리면 판때기가
+//   된다 — 실제로 두 번 다 겪었다. 역할을 나눈다.
+//
+//     HAZE  큰 반투명 시트. 아주 느리고 거의 안 보인다. 공기의 두께 담당.
+//     MID   주력. 바람에 실려 흐르는 알갱이. 지금까지 튜닝한 그 층이다.
+//     GRIT  카메라 바로 앞 소수의 빠른 알갱이. 렌즈에 스치는 티끌.
+//
+//   층마다 크기/속도/알파가 다르므로 시차(parallax)가 생겨 깊이가 읽힌다.
+//   같은 값이면 아무리 개수를 늘려도 한 장의 평면으로 보인다.
+//
 // 왜 카메라 자식으로 붙이나
 //   먼지를 씬 전체에 뿌리면 카메라가 어디로 가든 보이게 하려고 수십만
-//   파티클이 필요하다. 카메라에 붙여 작은 박스 안에서만 돌리면 몇백 개로
+//   파티클이 필요하다. 카메라에 붙여 작은 박스 안에서만 돌리면 몇천 개로
 //   같은 인상을 낸다. 어차피 먼지는 개체를 식별하는 대상이 아니라
 //   "공기 중에 뭔가 떠 있다" 는 신호라 위치의 절대성이 필요 없다.
 //
@@ -20,6 +32,11 @@
 // 렌더링
 //   Additive 가 아니라 Alpha Blend 를 쓴다. 황사는 빛나는 게 아니라
 //   빛을 가리는 입자다. Additive 로 하면 반딧불이가 된다.
+//
+//   Soft Particles 를 켠다. 빌보드가 난간이나 바닥과 만나는 선에서 종이를
+//   오려 붙인 것처럼 잘리는데, 뒤에 있는 불투명 면이 가까울수록 알파를
+//   낮춰 그 경계를 지운다. URP 에셋의 Depth Texture 가 필요하다
+//   (PC_RPAsset 은 켜져 있다 — 볼류메트릭 안개가 이미 쓰는 중).
 
 using System.IO;
 using System.Linq;
@@ -33,42 +50,13 @@ public static class SetupDustParticles
     const string RootName = "DUST_Particles";
     const string TexDir   = "Assets/yeouido63/Runtime/Textures/Dust";
     const string TexPath  = TexDir + "/DustParticle.png";
+    const string SoftPath = TexDir + "/DustSoft.png";
     const string MatPath  = TexDir + "/M_DustParticle.mat";
+    const string HazeMat  = TexDir + "/M_DustHaze.mat";
 
-    // 카메라를 둘러싼 박스. 이 안에서만 먼지가 돈다.
-    //
-    //   34x18x34 로 잡았더니 먼지가 하늘 쪽(=멀고 높은 곳)에만 보였다.
-    //   박스가 카메라 중심이라 절반이 뒤쪽에 뿌려지고, 앞쪽 입자도 화면
-    //   가운데(밝은 잔디)에서는 대비가 낮아 묻혔기 때문이다.
-    //   박스를 납작하게(높이 18 -> 11) 줄여 시선 높이에 모으고, 아래 shape
-    //   위치에서 카메라 앞쪽으로 밀어 화면을 가로지르게 한다.
-    static readonly Vector3 BoxSize = new Vector3(30f, 11f, 30f);
-
-    // "휭휭" 날아가는 강풍 황사.
-    //   빠르게 흐르면 한 알이 화면에 머무는 시간이 짧아진다. 그래서 수명을
-    //   줄이는 대신 방출량을 크게 올려야 화면 밀도가 유지된다.
-    //
-    //   개수를 다시 크게 올렸다(700 -> 2600 -> 6000, 방출 260 -> 900 -> 2100/s).
-    //   빌보드 파티클은 정점 8개짜리라 수천 개도 드로우콜 하나로 나간다.
-    //   비용은 개수보다 화면을 덮는 픽셀 면적(오버드로)이 지배한다.
-    //
-    //   그래서 크기를 줄인 지금은 오히려 여유가 생겼다. 입자 지름을 1/3 로
-    //   줄이면 덮는 면적은 1/9 이라, 개수를 2.3 배 올려도 총 오버드로는
-    //   예전의 4분의 1 수준이다. 알갱이는 작게, 밀도는 높게 — 그래야
-    //   눈송이가 흩날리는 게 아니라 먼지가 자욱하게 읽힌다.
-    const int   MaxParticles = 6000;
-    const float Rate         = 2100f;
-    const float LifeTime     = 2.6f;
-
-    // 바람 — 이 씬의 기준값이다.
-    //
-    //   먼지/잔디/구름이 각자 다른 방향·속도로 움직이면 같은 바람이
-    //   아니라 서로 다른 현상 셋으로 보인다. 여기 한 곳에서 정하고
-    //   SyncWind 가 잔디와 구름에 같은 값을 먹인다.
-    //
-    //   속력 범위는 여기서 정하고, 방향은 SyncWind.WindAngleDeg 하나로
-    //   결정한다. 예전엔 여기에 45 도 성분을 숫자로 박아 뒀는데, 그러면
-    //   SyncWind 에서 각도를 바꿔도 먼지만 옛 방향에 남는다.
+    // 속력 범위는 여기서 정하고, 방향은 SyncWind.WindAngleDeg 하나로
+    // 결정한다. 예전엔 여기에 45 도 성분을 숫자로 박아 뒀는데, 그러면
+    // SyncWind 에서 각도를 바꿔도 먼지만 옛 방향에 남는다.
     public const float SpeedMin = 9.3f;
     public const float SpeedMax = 20.2f;
 
@@ -97,104 +85,153 @@ public static class SetupDustParticles
 
         Remove();
 
-        var mat = BuildMaterial();
+        // soft fade 거리 — 뒤 불투명 면이 이 거리 안에 들어오면 알파를 낮춘다.
+        //   알갱이는 0.03~0.075m 라 0.6m 로 두면 자기 크기의 20 배 범위에서
+        //   페이드가 걸려, 바닥 근처 입자가 통째로 사라진다. 0.25m 면
+        //   교차선만 지우고 나머지는 남는다.
+        //   haze 는 6~16m 짜리 시트라 넓게(3.5m) 잡아야 벽과 만나는 선이
+        //   부드럽게 풀린다.
+        var matGrit = BuildMaterial(MatPath, TexPath, soft: 0.25f);
+        var matHaze = BuildMaterial(HazeMat, SoftPath, soft: 3.5f);
+        if (matGrit == null || matHaze == null)
+        {
+            Debug.LogError("[먼지] 머티리얼 준비 실패. 파티클을 심지 않는다.");
+            return;
+        }
 
-        var go = new GameObject(RootName);
-        go.transform.SetParent(cam.transform, false);
-        go.transform.localPosition = Vector3.zero;
-        go.transform.localRotation = Quaternion.identity;
-        Undo.RegisterCreatedObjectUndo(go, "먼지 파티클");
+        var root = new GameObject(RootName);
+        root.transform.SetParent(cam.transform, false);
+        root.transform.localPosition = Vector3.zero;
+        root.transform.localRotation = Quaternion.identity;
+        Undo.RegisterCreatedObjectUndo(root, "먼지 파티클");
 
-        var ps = go.AddComponent<ParticleSystem>();
+        int total = 0;
+        total += BuildHaze(root, matHaze);
+        total += BuildMid(root, matGrit);
+        total += BuildGrit(root, matGrit);
 
-        // ParticleSystem 은 모듈이 struct 라 지역변수에 받아 쓴다.
-        // (프로퍼티에 직접 대입이 안 된다)
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
+        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        AssetDatabase.SaveAssets();
+
+        Debug.Log($"[먼지] 카메라({cam.name}) 자식으로 3 층 {total}개 심음. " +
+                  $"Soft Particles 켬, 바람 {SyncWind.WindAngleDeg}도 {WindSpeed:F1} m/s.");
+    }
+
+    // ── 1층 HAZE ────────────────────────────────────────────────────────
+    // 큰 반투명 시트. 개별 입자로 인식되면 안 된다 — 알파를 아주 낮게 두고
+    // 크기를 키워 여러 장이 겹치면서 공기의 두께로만 읽히게 한다.
+    //
+    // 이 층이 없으면 알갱이만 날아다니고 그 사이가 맑아서, 먼지가 "낀"
+    // 게 아니라 "지나가는" 것처럼 보인다.
+    static int BuildHaze(GameObject root, Material mat)
+    {
+        const int Count = 90;
+        var go = NewSystem(root, "DUST_Haze", out var ps);
+
+        var main = ps.main;
+        main.duration = 12f;
+        main.loop = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(7f, 12f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.5f);
+        // 크게. 알갱이로 보이면 안 되므로 알파를 0.05 수준으로 눌러 둔다.
+        main.startSize = new ParticleSystem.MinMaxCurve(6f, 16f);
+        main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        main.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(0.76f, 0.76f, 0.77f, 0.075f),
+            new Color(0.62f, 0.62f, 0.65f, 0.035f));
+        main.maxParticles = Count;
+        main.gravityModifier = 0f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.playOnAwake = true;
+        main.prewarm = true;
+
+        var em = ps.emission;
+        em.enabled = true;
+        em.rateOverTime = Count / 9f;
+
+        var shape = ps.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = new Vector3(70f, 26f, 70f);
+        shape.position = new Vector3(0f, 0f, 12f);
+
+        // 느리게 흐른다. 큰 덩어리가 빠르면 시선을 끌어 정체가 드러난다.
+        WindVelocity(ps, 0.16f, 0.30f, -0.5f, 0.7f);
+
+        // 천천히 돈다. 큰 시트가 고정돼 있으면 같은 무늬가 겹쳐 보인다.
+        var rot = ps.rotationOverLifetime;
+        rot.enabled = true;
+        rot.z = new ParticleSystem.MinMaxCurve(-0.18f, 0.18f);
+
+        FadeInOut(ps, 0.25f, 0.7f);
+        SizeGrow(ps, 0.85f, 1.25f);
+
+        var rend = go.GetComponent<ParticleSystemRenderer>();
+        rend.renderMode = ParticleSystemRenderMode.Billboard;
+        Finish(rend, mat, -30);   // 가장 뒤에 그린다
+        return Count;
+    }
+
+    // ── 2층 MID ─────────────────────────────────────────────────────────
+    // 주력. 바람에 실려 흐르는 알갱이다. 크기·속도·난류는 앞서 화면을 보며
+    // 맞춘 값이라 유지한다. 여기에 크기 커브와 소프트 파티클만 더한다.
+    static int BuildMid(GameObject root, Material mat)
+    {
+        const int Count = 6000;
+        var go = NewSystem(root, "DUST_Mid", out var ps);
+
         var main = ps.main;
         main.duration = 5f;
         main.loop = true;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(LifeTime * 0.6f, LifeTime);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(1.56f, 2.6f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.25f, 1.1f);
+
         // 크기 — 여기가 "먼지냐 눈이냐" 를 가른다.
         //
         //   0.025~0.085m 는 안 보였고(5m 에서 3~10px), 0.09~0.26m 로 키웠더니
         //   눈송이가 됐다(5m 에서 11~32px). 720p/FOV60 기준으로
         //     3~6px  = 알갱이로 읽힌다
         //     10px+  = 눈송이로 보인다
-        //   0.03~0.075m 로 간다. 5m 에서 3.7~9.4px 라 알갱이 영역이다.
-        //
-        //   작아진 만큼 알파와 개수로 보상한다. 눈에 띄는 정도는
-        //   크기 x 알파 x 개수의 곱이라, 크기를 3분의 1로 줄여도 나머지를
-        //   올리면 존재감은 유지된다. 그러면서 개별 알갱이는 작게 남는다.
+        //   0.03~0.075m 면 5m 에서 3.7~9.4px 라 알갱이 영역이다.
         main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.075f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
 
         // 색 — 누런 황사가 아니라 회색 먼지.
-        //   작은 입자는 픽셀 몇 개로 표현되므로 알파가 낮으면 배경에 묻힌다.
-        //   0.38~0.62 -> 0.55~0.85 로 올려 작아도 또렷하게 만든다.
         main.startColor = new ParticleSystem.MinMaxGradient(
             new Color(0.74f, 0.74f, 0.75f, 0.85f),
             new Color(0.56f, 0.56f, 0.59f, 0.55f));
-        main.maxParticles = MaxParticles;
-        main.gravityModifier = 0.008f;              // 거의 안 떨어진다. 공기에 떠 있는 것
+        main.maxParticles = Count;
+        main.gravityModifier = 0.008f;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.playOnAwake = true;
-        main.prewarm = true;                        // 시작하자마자 화면이 차 있게
+        main.prewarm = true;
 
-        var emission = ps.emission;
-        emission.enabled = true;
-        emission.rateOverTime = Rate;
+        var em = ps.emission;
+        em.enabled = true;
+        em.rateOverTime = 2100f;
 
-        // 카메라를 감싸는 박스에서 방출한다.
-        //
-        //   박스는 카메라 로컬이다. 그래서 +Z 가 카메라가 보는 방향이다.
-        //   앞쪽(+Z)으로 밀어야 화면 안에서 먼지가 돈다. 중심에 두면 절반이
-        //   카메라 뒤에 뿌려져 그냥 버려진다.
-        //   X 는 바람 상류(-X)로 조금 밀어 화면을 가로질러 흐르게 한다.
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Box;
-        shape.scale = BoxSize;
-        shape.position = new Vector3(-BoxSize.x * 0.25f, 0f, BoxSize.z * 0.35f);
+        var box = new Vector3(30f, 11f, 30f);
+        shape.scale = box;
+        shape.position = new Vector3(-box.x * 0.25f, 0f, box.z * 0.35f);
 
-        // 바람 — 볼류메트릭 안개, 잔디, 구름과 같은 방향으로 흘려야
-        // 넷이 따로 노는 것처럼 보이지 않는다.
-        //
-        // 방향을 XZ 평면에서 45 도로 맞췄다. 이전에는 x 9~19 / z 2.5~7 이라
-        // 실제 각도가 19 도쯤이었고, 화면을 거의 가로로만 지나가서
-        // 깊이감이 없었다. 45 도면 화면 안쪽으로도 밀려 들어간다.
-        //
-        // 속력은 그대로 둔다(9.3~20.2 m/s). 방향만 돌리는 거라
-        // 각 성분을 속력/sqrt(2) 로 잡으면 크기가 보존된다.
-        // 그냥 z 를 x 와 같게 만들면 속력이 1.41 배 뛰어 더 사나워진다.
-        //
-        // 개체마다 속도 편차를 크게 둬야 한 덩어리로 흐르지 않고 휘몰아친다.
-        //   방향은 SyncWind 의 각도를 따른다. 축별 성분은 그 각도의
-        //   cos/sin 에 속력 범위를 곱해서 만든다.
-        //
         //   범위를 넓게(0.55~1.15 배) 흩뿌리는 이유 — 각 축을 같은 비율로
         //   추첨하면 개체 각도가 기준값 근처로 몰려 폭이 39 도밖에 안 됐고,
         //   전부 나란히 흘러 흐름이 한 줄 직선으로 보였다. 범위를 벌리면
         //   평균 방향은 유지되면서 개체마다 각도가 흩어진다.
-        float rad = SyncWind.WindAngleDeg * Mathf.Deg2Rad;
-        float cx = Mathf.Cos(rad), cz = Mathf.Sin(rad);
+        WindVelocity(ps, 0.55f, 1.15f, -2.4f, 3.4f);
 
-        var vel = ps.velocityOverLifetime;
-        vel.enabled = true;
-        vel.space = ParticleSystemSimulationSpace.World;
-        vel.x = new ParticleSystem.MinMaxCurve(SpeedMin * cx * 0.55f, SpeedMax * cx * 1.15f);
-        vel.y = new ParticleSystem.MinMaxCurve(-2.4f, 3.4f);
-        vel.z = new ParticleSystem.MinMaxCurve(SpeedMin * cz * 0.55f, SpeedMax * cz * 1.15f);
-
-        // 흩날림 — 직선으로만 가면 비 오는 것처럼 보인다.
+        // 난류 세기는 바람 속력과의 "비"로 봐야 한다. 절대값만 보면
+        // 1.9 가 작지 않아 보이지만 바람이 14.8 m/s 라 12.8% 에 불과했고,
+        // 궤적이 직선에서 ±7도밖에 안 꺾여 그냥 직선으로 보였다.
+        // 3.2~5.6 이면 ±13~21도라 눈에 휘어지는 게 읽힌다.
         //
-        //   난류 세기는 바람 속력과의 "비"로 봐야 한다. 절대값만 보면
-        //   1.9 가 작지 않아 보이지만 바람이 14.8 m/s 라 12.8% 에 불과했고,
-        //   궤적이 직선에서 ±7도밖에 안 꺾여 그냥 직선으로 보였다.
-        //   5.0 이면 ±19도라 눈에 휘어지는 게 읽힌다.
-        //
-        //   damping 을 끈다. 켜 두면 노이즈가 속도에 비례해 감쇠되는데,
-        //   바람이 빠를수록 난류가 죽어서 빠른 입자일수록 더 직선이 된다.
-        //   휘몰아치게 하려는 의도와 정반대다.
+        // damping 을 끈다. 켜 두면 노이즈가 속도에 비례해 감쇠되는데,
+        // 바람이 빠를수록 난류가 죽어서 빠른 입자일수록 더 직선이 된다.
         var noise = ps.noise;
         noise.enabled = true;
         noise.strength = new ParticleSystem.MinMaxCurve(3.2f, 5.6f);
@@ -202,61 +239,169 @@ public static class SetupDustParticles
         noise.scrollSpeed = new ParticleSystem.MinMaxCurve(1.4f);
         noise.quality = ParticleSystemNoiseQuality.Medium;
         noise.damping = false;
-
-        // 소용돌이 — 노이즈만으로는 결이 부드럽게 휘기만 한다.
-        // 회전 성분을 섞어야 먼지가 말려 올라가는 덩어리로 보인다.
-        noise.remapEnabled = false;
         noise.octaveCount = 2;
         noise.octaveMultiplier = 0.55f;
         noise.octaveScale = 2.2f;
 
-        // 수명 양끝에서 서서히 나타나고 사라지게 — 안 그러면 팝 하고 튄다
-        var col = ps.colorOverLifetime;
-        col.enabled = true;
-        var grad = new Gradient();
-        grad.SetKeys(
-            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-            new[] {
-                new GradientAlphaKey(0f,    0f),
-                new GradientAlphaKey(1f,    0.18f),
-                new GradientAlphaKey(1f,    0.75f),
-                new GradientAlphaKey(0f,    1f),
-            });
-        col.color = new ParticleSystem.MinMaxGradient(grad);
+        FadeInOut(ps, 0.18f, 0.75f);
 
-        // 회전은 끈다. 아래에서 Stretch 렌더 모드를 쓰는데, 그 모드는 입자를
-        // 속도 방향으로 정렬하므로 회전값이 무시된다. 켜 두면 인스펙터에서
-        // 동작하는 것처럼 보여 헷갈린다.
-        var rot = ps.rotationOverLifetime;
-        rot.enabled = false;
+        // 크기 커브 — 작게 시작해 중간에 커지고 다시 줄어든다.
+        //   알파만 페이드하면 "같은 크기 점이 밝아졌다 어두워지는" 것으로
+        //   보인다. 크기가 같이 변해야 멀리서 다가왔다 멀어지는 것처럼 읽힌다.
+        //
+        //   0.55~1.15 로 잡았다가 먼지가 거의 사라졌다. startSize 가 이미
+        //   3.7~9.4px 인데 거기 0.55 를 곱하면 2.1~5.1px 가 되고, 작은 쪽은
+        //   1px 미만으로 내려가 렌더링에서 빠진다. 실제로 하늘 영역 알갱이가
+        //   수천 개에서 279 개로 줄었다.
+        //   커브는 1.0 을 기준으로 ±15% 만 흔든다. 크기 변화는 "느껴지는"
+        //   정도면 충분하고, 알갱이가 사라지면 아무 의미가 없다.
+        SizeGrow(ps, 0.9f, 1.15f);
+
+        // 회전은 끈다. 아래 Stretch 모드가 입자를 속도 방향으로 정렬하므로
+        // 회전값이 무시된다. 켜 두면 인스펙터에서 동작하는 것처럼 보여 헷갈린다.
+        var midRot = ps.rotationOverLifetime;
+        midRot.enabled = false;
 
         var rend = go.GetComponent<ParticleSystemRenderer>();
 
         // 스트레치 빌보드 — 진행 방향으로 늘어난다.
-        //   속도를 올려 놓고 동그란 점으로 두면 빨라진 게 눈에 안 들어온다.
-        //   늘여야 "휭 지나갔다" 가 읽힌다.
-        //
-        //   다만 늘임은 절대 길이(m)로 붙는데 입자 크기는 줄였다. 예전 값
-        //   0.06 x 19m/s = 1.14m 꼬리는 0.03m 알갱이의 38 배라 그냥 빗줄기다.
-        //   0.022 로 낮추면 0.42m — 알갱이 대비 6~14 배라 "날리는 결" 정도로
-        //   읽힌다. 크기를 줄일 때 여기를 같이 안 내리면 눈이 비로 바뀔 뿐이다.
+        //   늘임은 절대 길이(m)로 붙는데 입자는 0.03m 다. 예전 값
+        //   0.06 x 19m/s = 1.14m 꼬리는 알갱이의 38 배라 빗줄기가 됐다.
+        //   0.022 면 0.42m — 알갱이 대비 6~14 배로 "날리는 결" 정도다.
         rend.renderMode = ParticleSystemRenderMode.Stretch;
         rend.velocityScale = 0.022f;
-        rend.lengthScale = 1.2f;            // 기본 길이는 거의 원형에 가깝게
-        rend.cameraVelocityScale = 0f;      // 카메라 이동에는 반응하지 않게
+        rend.lengthScale = 1.2f;
+        rend.cameraVelocityScale = 0f;
+        Finish(rend, mat, 0);
+        return Count;
+    }
 
+    // ── 3층 GRIT ────────────────────────────────────────────────────────
+    // 카메라 코앞을 스치는 소수의 큰 알갱이. 렌즈에 붙을 듯 지나가는 티끌이다.
+    //
+    // 개수가 적어야 한다. 가까워서 화면을 크게 덮으므로 많으면 시야를
+    // 가리고 오버드로도 급증한다. 60 개로 충분히 읽힌다.
+    static int BuildGrit(GameObject root, Material mat)
+    {
+        const int Count = 60;
+        var go = NewSystem(root, "DUST_Grit", out var ps);
+
+        var main = ps.main;
+        main.duration = 3f;
+        main.loop = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 1.0f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 2f);
+        // 가까우니 월드 크기는 작아도 화면에서는 크게 잡힌다.
+        main.startSize = new ParticleSystem.MinMaxCurve(0.012f, 0.045f);
+        main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+        main.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(0.78f, 0.78f, 0.79f, 0.7f),
+            new Color(0.58f, 0.58f, 0.61f, 0.4f));
+        main.maxParticles = Count;
+        main.gravityModifier = 0.01f;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.playOnAwake = true;
+        main.prewarm = true;
+
+        var em = ps.emission;
+        em.enabled = true;
+        em.rateOverTime = Count / 0.7f;
+
+        // 카메라 바로 앞 얇은 판에서만 뿌린다.
+        var shape = ps.shape;
+        shape.enabled = true;
+        shape.shapeType = ParticleSystemShapeType.Box;
+        shape.scale = new Vector3(6f, 3.5f, 2.5f);
+        shape.position = new Vector3(-1.5f, 0f, 1.6f);
+
+        // 더 빠르게. 가까운 것이 빨리 지나가야 시차로 깊이가 읽힌다.
+        WindVelocity(ps, 1.1f, 1.6f, -2f, 2.5f);
+
+        var noise = ps.noise;
+        noise.enabled = true;
+        noise.strength = new ParticleSystem.MinMaxCurve(4f, 7f);
+        noise.frequency = 0.7f;
+        noise.scrollSpeed = new ParticleSystem.MinMaxCurve(2f);
+        noise.quality = ParticleSystemNoiseQuality.Medium;
+        noise.damping = false;
+
+        FadeInOut(ps, 0.2f, 0.7f);
+
+        var rend = go.GetComponent<ParticleSystemRenderer>();
+        rend.renderMode = ParticleSystemRenderMode.Stretch;
+        rend.velocityScale = 0.03f;
+        rend.lengthScale = 1.4f;
+        rend.cameraVelocityScale = 0f;
+        Finish(rend, mat, 30);   // 가장 앞에 그린다
+        return Count;
+    }
+
+    // ── 공통 ────────────────────────────────────────────────────────────
+
+    static GameObject NewSystem(GameObject root, string name, out ParticleSystem ps)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(root.transform, false);
+        go.transform.localPosition = Vector3.zero;
+        go.transform.localRotation = Quaternion.identity;
+        ps = go.AddComponent<ParticleSystem>();
+        return go;
+    }
+
+    // 바람 방향은 SyncWind 의 각도를 따른다. 축별 성분은 그 각도의
+    // cos/sin 에 속력 범위를 곱해서 만든다. 배율로 층마다 세기를 바꾼다.
+    static void WindVelocity(ParticleSystem ps, float lo, float hi, float yMin, float yMax)
+    {
+        float rad = SyncWind.WindAngleDeg * Mathf.Deg2Rad;
+        float cx = Mathf.Cos(rad), cz = Mathf.Sin(rad);
+
+        var vel = ps.velocityOverLifetime;
+        vel.enabled = true;
+        vel.space = ParticleSystemSimulationSpace.World;
+        vel.x = new ParticleSystem.MinMaxCurve(SpeedMin * cx * lo, SpeedMax * cx * hi);
+        vel.y = new ParticleSystem.MinMaxCurve(yMin, yMax);
+        vel.z = new ParticleSystem.MinMaxCurve(SpeedMin * cz * lo, SpeedMax * cz * hi);
+    }
+
+    // 수명 양끝에서 서서히 나타나고 사라지게 — 안 그러면 팝 하고 튄다
+    static void FadeInOut(ParticleSystem ps, float inT, float outT)
+    {
+        var col = ps.colorOverLifetime;
+        col.enabled = true;
+        var g = new Gradient();
+        g.SetKeys(
+            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            new[] {
+                new GradientAlphaKey(0f, 0f),
+                new GradientAlphaKey(1f, inT),
+                new GradientAlphaKey(1f, outT),
+                new GradientAlphaKey(0f, 1f),
+            });
+        col.color = new ParticleSystem.MinMaxGradient(g);
+    }
+
+    // 작게 시작 -> 중간에 최대 -> 다시 줄어듦.
+    //   sizeMultiplier 를 1 로 두고 커브 자체에 값을 넣는다. 커브가 0~1 을
+    //   벗어나면 Unity 가 자동으로 multiplier 를 뽑아내면서 모양이 뭉개진다.
+    static void SizeGrow(ParticleSystem ps, float start, float peak)
+    {
+        var sol = ps.sizeOverLifetime;
+        sol.enabled = true;
+        var c = new AnimationCurve(
+            new Keyframe(0f, start),
+            new Keyframe(0.45f, peak),
+            new Keyframe(1f, start * 0.8f));
+        sol.size = new ParticleSystem.MinMaxCurve(1f, c);
+    }
+
+    static void Finish(ParticleSystemRenderer rend, Material mat, int fudge)
+    {
         rend.sharedMaterial = mat;
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         rend.receiveShadows = false;
-        rend.sortingFudge = 0f;
-
-        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
-        AssetDatabase.SaveAssets();
-
-        Debug.Log($"[먼지] 카메라({cam.name}) 자식으로 파티클 {MaxParticles}개 심음. " +
-                  $"박스 {BoxSize}, World 시뮬레이션.");
+        // 층 순서를 고정한다. 안 그러면 카메라가 돌 때마다 정렬이 뒤바뀌어
+        // haze 가 알갱이 앞으로 튀어나온다.
+        rend.sortingFudge = fudge;
     }
 
     [MenuItem("Tools/Yeouido 63/먼지 파티클 제거")]
@@ -268,33 +413,44 @@ public static class SetupDustParticles
 
     // 가운데가 밝고 가장자리로 갈수록 투명해지는 원. 외부 에셋을 받지 않고
     // 코드로 굽는다 — 먼지 한 알에 텍스처 파일을 끌어올 이유가 없다.
-    static Texture2D BuildTexture()
+    //
+    //   pow 로 감쇠 곡선을 바꾼다. 알갱이(2.0)는 중심을 조여 또렷하게,
+    //   haze(0.75)는 넓게 퍼뜨려 테두리가 안 보이게 한다. 같은 텍스처를
+    //   쓰면 haze 가 "큰 점" 으로 보여 정체가 드러난다.
+    static Texture2D BuildTexture(string path, float power, int size)
     {
-        var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(TexPath);
+        var existing = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         if (existing != null) return existing;
 
-        const int S = 64;
-        var tex = new Texture2D(S, S, TextureFormat.RGBA32, true);
-        var px = new Color[S * S];
-        float c = (S - 1) * 0.5f;
-        for (int y = 0; y < S; y++)
-        for (int x = 0; x < S; x++)
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+        var px = new Color[size * size];
+        float c = (size - 1) * 0.5f;
+
+        // 얼룩 — 균일한 원은 아무리 작아도 "완벽한 점" 이라 인공적이다.
+        // 저주파 노이즈를 곱해 알갱이마다 모양이 조금씩 다르게 만든다.
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
         {
             float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c)) / c;
             // smoothstep 으로 부드럽게 떨어뜨린다. 선형이면 테두리가 보인다.
             float a = 1f - Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(d));
-            a *= a;                                   // 중심을 더 조이기
-            px[y * S + x] = new Color(1f, 1f, 1f, a);
+            a = Mathf.Pow(a, power);
+
+            // 평균이 1 근처가 되게 잡는다. 0.45*n + 0.72 로 두면 평균이
+            // 0.945 라 전체가 살짝 옅어지는데, 소프트 파티클 페이드까지
+            // 겹치면 그 손실이 눈에 띈다.
+            float n = Mathf.PerlinNoise(x * 0.09f, y * 0.09f) * 0.5f + 0.75f;
+            px[y * size + x] = new Color(1f, 1f, 1f, Mathf.Clamp01(a * n));
         }
         tex.SetPixels(px);
         tex.Apply(true);
 
         Directory.CreateDirectory(TexDir);
-        File.WriteAllBytes(TexPath, tex.EncodeToPNG());
+        File.WriteAllBytes(path, tex.EncodeToPNG());
         Object.DestroyImmediate(tex);
-        AssetDatabase.ImportAsset(TexPath, ImportAssetOptions.ForceUpdate);
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
 
-        var ti = AssetImporter.GetAtPath(TexPath) as TextureImporter;
+        var ti = AssetImporter.GetAtPath(path) as TextureImporter;
         if (ti != null)
         {
             ti.textureType = TextureImporterType.Default;
@@ -302,22 +458,37 @@ public static class SetupDustParticles
             ti.wrapMode = TextureWrapMode.Clamp;
             ti.SaveAndReimport();
         }
-        return AssetDatabase.LoadAssetAtPath<Texture2D>(TexPath);
+        return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
     }
 
-    static Material BuildMaterial()
+    static Material BuildMaterial(string matPath, string texPath, float soft)
     {
-        var tex = BuildTexture();
+        bool isHaze = texPath == SoftPath;
+        var tex = BuildTexture(texPath, isHaze ? 0.75f : 2.0f, isHaze ? 128 : 64);
 
-        var m = AssetDatabase.LoadAssetAtPath<Material>(MatPath);
-        // URP 의 파티클 전용 셰이더. 없으면 Unlit 으로 떨어진다.
+        // URP 의 파티클 전용 셰이더.
+        //
+        //   못 찾으면 중단한다. 예전에 Unlit 으로 폴백하게 뒀는데, 셰이더를
+        //   못 찾은 상태에서 머티리얼이 만들어지면 화면이 통째로 마젠타가
+        //   된다. 조용히 잘못된 걸 만드느니 로그를 남기고 멈추는 게 낫다.
         var sh = Shader.Find("Universal Render Pipeline/Particles/Unlit")
               ?? Shader.Find("Universal Render Pipeline/Unlit");
+        if (sh == null)
+        {
+            Debug.LogError("[먼지] URP 파티클 셰이더를 못 찾았다. 머티리얼을 만들지 않는다.");
+            return null;
+        }
+
+        var m = AssetDatabase.LoadAssetAtPath<Material>(matPath);
         if (m == null)
         {
             m = new Material(sh);
             Directory.CreateDirectory(TexDir);
-            AssetDatabase.CreateAsset(m, MatPath);
+            AssetDatabase.CreateAsset(m, matPath);
+            // 같은 프레임에 렌더러가 참조하므로 바로 디스크에 반영한다.
+            // 이게 없으면 에셋이 아직 없는 상태로 sharedMaterial 에 물려
+            // 다음 리로드에서 참조가 끊긴다 — 화면이 마젠타가 된다.
+            AssetDatabase.SaveAssets();
         }
         m.shader = sh;
 
@@ -341,6 +512,31 @@ public static class SetupDustParticles
         m.DisableKeyword("_ALPHATEST_ON");
         m.DisableKeyword("_ALPHAPREMULTIPLY_ON");
 
+        // Soft Particles — 빌보드가 불투명 면과 만나는 선에서 종이를 오려
+        // 붙인 것처럼 잘리는 걸 없앤다. 뒤 면이 fade 거리 안으로 들어오면
+        // 알파를 낮춘다.
+        //
+        //   _SoftParticleFadeParams 를 같이 써야 한다. 키워드와 Enabled
+        //   플래그만 켜고 이 벡터를 안 채우면 near=far=0 이라 셰이더가
+        //   0 으로 나누고, 페이드가 전혀 안 걸린다 — 인스펙터에는 켜진
+        //   것처럼 보여서 됐다고 착각하기 쉽다.
+        //   URP 규약: (near, 1/(far-near), 0, 0)
+        m.SetFloat("_SoftParticlesEnabled", 1f);
+        m.SetFloat("_SoftParticlesNearFadeDistance", 0f);
+        m.SetFloat("_SoftParticlesFarFadeDistance", soft);
+        m.SetVector("_SoftParticleFadeParams", new Vector4(0f, 1f / Mathf.Max(soft, 1e-4f), 0f, 0f));
+        m.EnableKeyword("_SOFTPARTICLES_ON");
+
+        // 카메라 페이드 — 근평면을 뚫고 들어온 입자가 화면을 통째로
+        // 덮는 걸 막는다. 3 층 구조에서 GRIT 이 카메라 코앞을 지나므로
+        // 이게 없으면 가끔 화면 전체가 희뿌옇게 번쩍인다.
+        const float NearFade = 0.15f, FarFade = 0.85f;
+        m.SetFloat("_CameraFadingEnabled", 1f);
+        m.SetFloat("_CameraNearFadeDistance", NearFade);
+        m.SetFloat("_CameraFarFadeDistance", FarFade);
+        m.SetVector("_CameraFadeParams", new Vector4(NearFade, 1f / (FarFade - NearFade), 0f, 0f));
+        m.EnableKeyword("_FADING_ON");
+
         if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
         if (m.HasProperty("_Color"))     m.SetColor("_Color", Color.white);
 
@@ -348,4 +544,3 @@ public static class SetupDustParticles
         return m;
     }
 }
-

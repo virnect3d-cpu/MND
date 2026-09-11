@@ -66,13 +66,14 @@ public static class SetupDustParticles
     //   아니라 서로 다른 현상 셋으로 보인다. 여기 한 곳에서 정하고
     //   SyncWind 가 잔디와 구름에 같은 값을 먹인다.
     //
-    //   45 도 방향의 X/Z 성분. 속력 9.3~20.2 m/s 를 유지하면서 각도만
-    //   돌린 값이라 성분은 속력/sqrt(2) 다.
-    public const float WindMin = 6.6f;
-    public const float WindMax = 14.32f;
+    //   속력 범위는 여기서 정하고, 방향은 SyncWind.WindAngleDeg 하나로
+    //   결정한다. 예전엔 여기에 45 도 성분을 숫자로 박아 뒀는데, 그러면
+    //   SyncWind 에서 각도를 바꿔도 먼지만 옛 방향에 남는다.
+    public const float SpeedMin = 9.3f;
+    public const float SpeedMax = 20.2f;
 
-    // 잔디/구름이 맞춰야 할 대표 풍속 (중간값 기준, m/s)
-    public static float WindSpeed => Mathf.Sqrt(2f) * (WindMin + WindMax) * 0.5f;
+    // 대표 풍속 (중간값, m/s). 잔디/안개/구름이 여기 맞춘다.
+    public static float WindSpeed => (SpeedMin + SpeedMax) * 0.5f;
 
     [DidReloadScripts]
     static void OnReload()
@@ -167,24 +168,47 @@ public static class SetupDustParticles
         // 그냥 z 를 x 와 같게 만들면 속력이 1.41 배 뛰어 더 사나워진다.
         //
         // 개체마다 속도 편차를 크게 둬야 한 덩어리로 흐르지 않고 휘몰아친다.
+        //   방향은 SyncWind 의 각도를 따른다. 축별 성분은 그 각도의
+        //   cos/sin 에 속력 범위를 곱해서 만든다.
+        //
+        //   범위를 넓게(0.55~1.15 배) 흩뿌리는 이유 — 각 축을 같은 비율로
+        //   추첨하면 개체 각도가 기준값 근처로 몰려 폭이 39 도밖에 안 됐고,
+        //   전부 나란히 흘러 흐름이 한 줄 직선으로 보였다. 범위를 벌리면
+        //   평균 방향은 유지되면서 개체마다 각도가 흩어진다.
+        float rad = SyncWind.WindAngleDeg * Mathf.Deg2Rad;
+        float cx = Mathf.Cos(rad), cz = Mathf.Sin(rad);
+
         var vel = ps.velocityOverLifetime;
         vel.enabled = true;
         vel.space = ParticleSystemSimulationSpace.World;
-        vel.x = new ParticleSystem.MinMaxCurve(WindMin, WindMax);
-        vel.y = new ParticleSystem.MinMaxCurve(-1.6f, 2.2f);
-        vel.z = new ParticleSystem.MinMaxCurve(WindMin, WindMax);
+        vel.x = new ParticleSystem.MinMaxCurve(SpeedMin * cx * 0.55f, SpeedMax * cx * 1.15f);
+        vel.y = new ParticleSystem.MinMaxCurve(-2.4f, 3.4f);
+        vel.z = new ParticleSystem.MinMaxCurve(SpeedMin * cz * 0.55f, SpeedMax * cz * 1.15f);
 
         // 흩날림 — 직선으로만 가면 비 오는 것처럼 보인다.
-        // 속도를 올린 만큼 난류도 같이 키워야 "휭휭" 휘몰아치는 느낌이 난다.
-        // 세기만 올리고 주파수를 그대로 두면 큰 덩어리가 통째로 흔들려
-        // 물결처럼 보이므로 주파수도 함께 올린다.
+        //
+        //   난류 세기는 바람 속력과의 "비"로 봐야 한다. 절대값만 보면
+        //   1.9 가 작지 않아 보이지만 바람이 14.8 m/s 라 12.8% 에 불과했고,
+        //   궤적이 직선에서 ±7도밖에 안 꺾여 그냥 직선으로 보였다.
+        //   5.0 이면 ±19도라 눈에 휘어지는 게 읽힌다.
+        //
+        //   damping 을 끈다. 켜 두면 노이즈가 속도에 비례해 감쇠되는데,
+        //   바람이 빠를수록 난류가 죽어서 빠른 입자일수록 더 직선이 된다.
+        //   휘몰아치게 하려는 의도와 정반대다.
         var noise = ps.noise;
         noise.enabled = true;
-        noise.strength = new ParticleSystem.MinMaxCurve(1.9f);
-        noise.frequency = 0.55f;
+        noise.strength = new ParticleSystem.MinMaxCurve(3.2f, 5.6f);
+        noise.frequency = 0.42f;
         noise.scrollSpeed = new ParticleSystem.MinMaxCurve(1.4f);
         noise.quality = ParticleSystemNoiseQuality.Medium;
-        noise.damping = true;
+        noise.damping = false;
+
+        // 소용돌이 — 노이즈만으로는 결이 부드럽게 휘기만 한다.
+        // 회전 성분을 섞어야 먼지가 말려 올라가는 덩어리로 보인다.
+        noise.remapEnabled = false;
+        noise.octaveCount = 2;
+        noise.octaveMultiplier = 0.55f;
+        noise.octaveScale = 2.2f;
 
         // 수명 양끝에서 서서히 나타나고 사라지게 — 안 그러면 팝 하고 튄다
         var col = ps.colorOverLifetime;

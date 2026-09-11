@@ -31,11 +31,11 @@ Material:
     m_Floats:
     - _Cutoff: 0.35
     - _Smoothness: 0.18
-    - _WindFreq: 0.22
-    - _WindSpeed: 3.2543883
+    - _WindFreq: 0.62
+    - _WindSpeed: 9.145
     - _WindStrength: 0.12
     m_Colors:
     - _BaseColor: {r: 0.96, g: 1, b: 0.88, a: 1}
-    - _WindDir: {r: 0.70710677, g: 0, b: 0.70710677, a: 0}
+    - _WindDir: {r: 0.8660254, g: 0, b: 0.5, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

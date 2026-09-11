@@ -31,8 +31,16 @@ Shader "Yeouido63/GrassWind"
         //
         //   _WindSpeed 하나만 올리면 안 된다. 그건 "얼마나 빨리 떠느냐"고
         //   눈에 보이는 바람 속도는 S/F 라서, F 를 같이 건드리면 도로 어긋난다.
-        _WindSpeed      ("Wind Speed", Range(0,5)) = 3.25
-        _WindFreq       ("Wind Frequency", Range(0,2)) = 0.22
+        //
+        //   상한을 5 -> 20 으로 올렸다. F 를 키워 결을 촘촘하게 만들면
+        //   같은 물결 속도를 내는 데 S = 14.79 * F 가 필요한데,
+        //   F=0.62 에서 이미 9.2 라 5 에 잘려 조용히 느려졌다.
+        _WindSpeed      ("Wind Speed", Range(0,20)) = 9.17
+        // 파장 = 2pi/F. 0.22 는 파장 28.6 m 로 옥상 폭(약 30m)과 거의 같아
+        // 잔디가 통째로 한 덩어리처럼 눕고 결이 안 보였다 — 그게 "직선으로
+        // 흐른다" 는 인상의 큰 원인이다. 0.62 면 파장 10.1 m 로 화면 안에
+        // 세 번쯤 들어와 바람이 훑고 지나가는 게 읽힌다.
+        _WindFreq       ("Wind Frequency", Range(0,2)) = 0.62
         // 바람 방향 (XZ, 정규화해서 씀). 먼지 파티클과 같은 값을 넣어야
         // 둘이 같은 바람으로 읽힌다 — SyncWind 가 맞춰 준다.
         _WindDir        ("Wind Direction (XZ)", Vector) = (0.7071, 0, 0.7071, 0)
@@ -137,8 +145,11 @@ Shader "Yeouido63/GrassWind"
                 // 알파 텍스처를 따로 받지 않으려는 것 — Grass003 은 지면 타일이라
                 // 알파가 없다.
                 float2 c = i.uv - float2(0.5, 0.0);
-                float taper = 1.0 - i.uv.y * 0.85;                  // 위로 갈수록 좁아짐
-                float blade = step(abs(c.x), taper * 0.5);
+                // 위로 갈수록 좁아진다. 0.85 -> 0.92 로 끝을 더 뾰족하게.
+                float taper = 1.0 - i.uv.y * 0.92;
+                // 잎 반폭. 0.5 는 쿼드를 꽉 채우는 값이라 잎이 두툼했다.
+                // 0.3 이면 밑둥 폭이 60% 로 줄어 가늘어진다.
+                float blade = step(abs(c.x), taper * 0.3);
                 float noise = frac(sin(dot(floor(i.uv * 8.0), float2(12.9898, 78.233))) * 43758.5453);
                 clip(blade * (noise * 0.4 + 0.6) - _Cutoff);
 

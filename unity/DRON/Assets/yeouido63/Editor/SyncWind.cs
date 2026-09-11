@@ -20,8 +20,8 @@
 //           근거가 없어서 비례만 맞춘다.
 //
 // 방향
-//   XZ 평면 45 도. 구름의 globalOrientation 은 도(degree) 단위이고
-//   기준축이 달라서 그대로 45 를 넣으면 안 된다 — 아래 주석 참고.
+//   WindAngleDeg 한 곳에서 정한다. 구름의 globalOrientation 은 도 단위인데
+//   기준축이 달라(나침반식) 그대로 넣으면 안 된다 — 아래 주석 참고.
 
 using System.IO;
 using UnityEditor;
@@ -36,8 +36,14 @@ public static class SyncWind
     const string FogMat   = "Assets/yeouido63/Runtime/Fog/M_VolumetricFog.mat";
     const string PostPath = "Assets/yeouido63/Scenes/Yeouido63_Post.asset";
 
-    // 바람 방향 — XZ 평면에서 45 도
-    const float WindAngleDeg = 45f;
+    // 바람 방향 — XZ 평면 각도. 0 도면 순수 +X, 90 도면 순수 +Z 다.
+    //
+    //   19 도는 거의 가로로만 흘러 깊이감이 없었고, 45 도는 X 와 Z 가
+    //   같은 비중이라 Z 축으로 가는 것처럼 보였다. 30 도면 X 가 Z 의
+    //   1.73 배라 X 축 방향이 분명하면서 안쪽으로 밀리는 느낌도 남는다.
+    //
+    //   여기 한 값만 바꾸면 먼지/잔디/안개/구름이 모두 따라온다.
+    public const float WindAngleDeg = 30f;
 
     [DidReloadScripts]
     static void OnReload()
@@ -54,7 +60,7 @@ public static class SyncWind
     public static void Run()
     {
         float rad = WindAngleDeg * Mathf.Deg2Rad;
-        var dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));   // (0.707, 0.707)
+        var dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
         float speed = SetupDustParticles.WindSpeed;              // m/s
 
         // --- 잔디 ---
@@ -65,16 +71,24 @@ public static class SyncWind
             grass.SetVector("_WindDir", new Vector4(dir.x, 0f, dir.y, 0f));
 
             // 물결 속도 = _WindSpeed / _WindFreq 이므로 역산한다.
-            // _WindFreq 는 결의 촘촘함이라 그대로 두고 속도만 맞춘다.
-            float freq = grass.HasProperty("_WindFreq") ? grass.GetFloat("_WindFreq") : 0.22f;
+            //
+            // _WindFreq 는 결의 촘촘함. 파장 = 2pi/F 다.
+            //   0.22 는 파장 28.6 m 로 옥상 폭과 거의 같아 잔디가 통째로
+            //   눕고 결이 안 보였다. 0.62 면 파장 10.1 m 로 화면에 세 번쯤
+            //   들어와 바람이 훑고 가는 게 읽힌다.
+            const float Freq = 0.62f;
+            float freq = Freq;
+            grass.SetFloat("_WindFreq", freq);
             float s = speed * freq;
 
-            // 셰이더 슬라이더 상한이 5 다. 넘으면 잘려서 조용히 느려지므로
+            // 셰이더 슬라이더 상한. 넘으면 잘려서 조용히 느려지므로
             // 그때는 freq 를 낮춰 S/F 비를 지킨다.
-            if (s > 5f)
+            // (상한을 5 -> 20 으로 올렸다. F=0.62 면 S=9.17 이라 5 로는 못 낸다.)
+            const float SpeedMax = 20f;
+            if (s > SpeedMax)
             {
-                freq = 5f / speed;
-                s = 5f;
+                freq = SpeedMax / speed;
+                s = SpeedMax;
                 grass.SetFloat("_WindFreq", freq);
                 Debug.Log($"[바람] 잔디 속도가 상한을 넘어 _WindFreq 를 {freq:F4} 로 낮춰 비를 맞췄다.");
             }
@@ -94,7 +108,7 @@ public static class SyncWind
             // 실제로도 큰 기단은 알갱이보다 천천히 움직이는 것처럼 보인다.
             fog.SetFloat("_WindSpeed", speed * 0.5f);
             EditorUtility.SetDirty(fog);
-            Debug.Log($"[바람] 안개: dir 45도, _WindSpeed={speed * 0.5f:F2}");
+            Debug.Log($"[바람] 안개: dir {WindAngleDeg}도, _WindSpeed={speed * 0.5f:F2}");
         }
 
         // --- 구름 ---
@@ -117,28 +131,48 @@ public static class SyncWind
 
             // 방향. globalOrientation 은 도 단위인데 기준축이 우리 XZ 각도와
             // 다르다 — 북(+Z)에서 시계방향으로 재는 나침반식이다.
-            // 우리 45 도는 +X 에서 +Z 로 잰 값이라, 나침반으로는 90-45=45.
-            // 마침 45 도에서는 두 표기가 같은 값이 되지만, 각도를 바꿀 때
+            // 우리 각도는 +X 에서 +Z 로 잰 값이라 나침반으로는 90-각도다.
             // 이 변환을 빼먹으면 구름만 엉뚱한 데로 흐른다.
-            float compass = 90f - WindAngleDeg;
+            //
+            // 0~360 으로 감아 준다. 이 파라미터는 ClampedFloatParameter(0,360)
+            // 이라 음수면 0 으로 잘린다 — WindAngleDeg 가 90 을 넘으면
+            // 90-각도가 음수가 되므로 감지 않으면 구름만 엉뚱한 데로 흐른다.
+            float compass = Mathf.Repeat(90f - WindAngleDeg, 360f);
             SetParam(so, "globalOrientation", compass);
 
             // 속도. 배율이라 m/s 로 환산할 근거가 없다.
-            // 기존 1.2 가 먼지 이전 풍속(14.8 m/s)에서 자연스러웠으니
-            // 같은 비로 둔다. 방향만 돌리는 변경이라 속도는 유지가 맞다.
-            SetParam(so, "globalSpeed", 1.2f);
+            //
+            //   1.2 는 너무 느렸다. 구름은 멀리 있어서 같은 속도라도
+            //   화면에서 움직이는 각도가 훨씬 작다 — 고도 250 m 에 떠 있고
+            //   수 km 밖까지 뻗어 있으니, 지면의 잔디와 같은 배율로 두면
+            //   거의 멈춘 것처럼 보인다. 거리 보정 삼아 4 배로 올린다.
+            //   (1.2 -> 4.8)
+            //
+            //   속도를 올릴 수 있는 건 사실상 이것뿐이다. 아래 두 배율은
+            //   상한이 1.0 이라(VolumetricCloudsVolume.cs 참고) 거기서
+            //   더 빠르게 만들 수 없다. globalSpeed 가 전체를 곱한다.
+            const float GlobalSpeed = 4.8f;
+            SetParam(so, "globalSpeed", GlobalSpeed);
 
             // 자전 — 구름이 흐르기만 하고 모양이 그대로면 판때기가
             // 미끄러지는 것처럼 보인다. 형상 노이즈를 같이 굴려야
             // 뭉쳤다 풀어지며 떠간다.
-            SetParam(so, "shapeSpeedMultiplier", 1.0f);
-            SetParam(so, "erosionSpeedMultiplier", 0.6f);
+            //
+            //   둘 다 ClampedFloatParameter(0, 1) 이라 최대가 1.0 이다.
+            //   2.4 / 3.0 을 넣으면 조용히 1.0 으로 잘린다 — 값은 적히는데
+            //   화면은 안 바뀌어서 적용된 줄 알기 쉽다. 상한으로 둔다.
+            const float ShapeSpeed = 1.0f, ErosionSpeed = 1.0f;
+            SetParam(so, "shapeSpeedMultiplier", ShapeSpeed);
+            SetParam(so, "erosionSpeedMultiplier", ErosionSpeed);
 
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             EditorUtility.SetDirty(post);
-            Debug.Log($"[바람] 구름: orientation={compass}도, globalSpeed=1.2, " +
-                      $"shapeSpeed=1.0, erosionSpeed=0.6");
+            // 값을 문자열에 박아 두지 않는다. 예전엔 globalSpeed 를 4.8 로
+            // 바꾸고도 로그에는 "1.2" 가 찍혀서, 적용이 안 된 줄 알고
+            // 리컴파일을 세 번이나 다시 돌렸다.
+            Debug.Log($"[바람] 구름: orientation={compass}도, globalSpeed={GlobalSpeed}, " +
+                      $"shapeSpeed={ShapeSpeed}, erosionSpeed={ErosionSpeed}");
             return;
         }
         Debug.LogWarning("[바람] 프로파일에 VolumetricClouds 가 없다.");
@@ -162,3 +196,4 @@ public static class SyncWind
         else { Debug.LogWarning($"[바람] 타입이 숫자가 아님: {name}"); return; }
     }
 }
+

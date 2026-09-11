@@ -16955,7 +16955,10 @@ MonoBehaviour:
   driveOrientation: 0
   thickness: 120
   density: 0.14
-  speed: 7.5
+  driftSpeed: 2.5
+  driftDirection: {x: 1, y: 0}
+  driftInEditMode: 1
+  speed: 2.5
   shapeSpeed: 1
   erosionSpeed: 1
   drawGizmo: 1

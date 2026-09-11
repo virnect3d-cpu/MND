@@ -17,6 +17,18 @@
 //   즉 오브젝트를 위로 끌면 구름이 실제로 올라간다. 옆으로 끌면 같은
 //   구름이 흘러간 것처럼 무늬가 밀린다.
 //
+// 드리프트 — 구름 덩어리를 통째로 흘려보낸다
+//   globalSpeed 는 구름이 "제자리에서 뭉개지고 굴러가는" 속도라, 아무리
+//   올려도 덩어리가 옆으로 지나가지는 않는다. 판 전체를 미는 건
+//   shapeOffset 뿐이다. 그래서 시간에 따라 오프셋을 누적한다.
+//
+//   Animation 클립과 같이 써도 안 싸우도록 쓰는 곳을 갈라 놨다.
+//     Animation -> transform.position  (기준점을 옮긴다)
+//     드리프트  -> _drift 내부 누적값
+//     최종      -> shapeOffset = position.xz + _drift
+//   서로 덮어쓰지 않고 더해지므로 "마지막에 쓴 쪽이 이기는" 문제가 없다.
+//   클립으로 기준점을 잡고 드리프트로 흐름을 얹으면 된다.
+//
 // 왜 프로파일을 직접 쓰나
 //   VolumeProfile 은 에셋이라 여기 쓴 값이 디스크에 남는다. 플레이 모드에서
 //   만진 값도 그대로 남는다는 뜻이다 — Volume 오버라이드의 원래 성질이라
@@ -55,10 +67,22 @@ public class CloudLayerHandle : MonoBehaviour
     [Range(0f, 1f)]
     public float density = 0.14f;
 
-    [Header("흐름")]
-    [Tooltip("전체 속도 배율. 상한이 없다.")]
+    [Header("드리프트 — 덩어리째 흐르기")]
+    [Tooltip("구름 덩어리가 흘러가는 속도(m/s). 0 이면 제자리에서 뭉개지기만 한다. " +
+             "shapeOffset 은 원근 감쇠가 없어서 지상 바람만큼 주면 너무 빠르다.")]
     [Min(0f)]
-    public float speed = 7.5f;
+    public float driftSpeed = 2.5f;
+
+    [Tooltip("흐르는 방향(XZ). 정규화해서 쓴다. (1,0)=+X, (0,-1)=-Z")]
+    public Vector2 driftDirection = new Vector2(1f, 0f);
+
+    [Tooltip("에디터에서 플레이 중이 아닐 때도 흐른다")]
+    public bool driftInEditMode = true;
+
+    [Header("흐름")]
+    [Tooltip("전체 속도 배율. 상한이 없다. 이건 '제자리에서 굴러가는' 속도라 이동과 무관하다.")]
+    [Min(0f)]
+    public float speed = 2.5f;
 
     [Tooltip("형상이 굴러가는 속도. 상한 1 이다.")]
     [Range(0f, 1f)]
@@ -83,13 +107,87 @@ public class CloudLayerHandle : MonoBehaviour
 
     VolumeComponent _clouds;
 
-    void OnEnable()  { Resolve(); Apply(); }
+    // 드리프트 누적값. transform.position 과 따로 들고 있어야
+    // Animation 클립이 position 을 써도 흐름이 지워지지 않는다.
+    Vector2 _drift;
+    float   _lastTime;
+
+    void OnEnable()
+    {
+        Resolve();
+        _lastTime = Time.realtimeSinceStartup;
+        Apply();
+#if UNITY_EDITOR
+        // 에디터 비플레이 모드는 화면에 뭔가 바뀔 때만 Update 를 돌린다.
+        // 그대로 두면 드리프트가 띄엄띄엄 움직이고, 창이 비포커스면
+        // 거의 멈춘다. 매 에디터 틱마다 플레이어 루프를 돌려 달라고 건다.
+        UnityEditor.EditorApplication.update -= EditorTick;
+        UnityEditor.EditorApplication.update += EditorTick;
+#endif
+    }
+
+#if UNITY_EDITOR
+    void OnDisable()
+    {
+        UnityEditor.EditorApplication.update -= EditorTick;
+    }
+
+    void EditorTick()
+    {
+        if (this == null) { UnityEditor.EditorApplication.update -= EditorTick; return; }
+        if (!isActiveAndEnabled || Application.isPlaying) return;
+        if (driftSpeed <= 0f || !driftInEditMode) return;
+        UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
+    }
+#endif
+
     void OnValidate() { Resolve(); Apply(); }
+
     void Update()
     {
-        // Transform 은 인스펙터 밖(씬 뷰 드래그)에서도 바뀌므로
+        bool moved = false;
+
+        if (driftSpeed > 0f && (Application.isPlaying || driftInEditMode))
+        {
+            // 에디터 비플레이 모드에서는 deltaTime 이 0 에 가깝거나 불규칙하다.
+            // 그대로 쓰면 씬 뷰를 건드릴 때만 찔끔 움직인다.
+            //
+            // 상한을 0.1 로 잡았더니 실측 12 m/s 가 0.8 m/s 로 나왔다.
+            // 에디터가 비포커스면 Update 간격이 0.1 초를 훌쩍 넘는데,
+            // 초과분이 전부 버려져서 속도가 7% 로 떨어진 것이다.
+            // 0.5 로 올려 대부분의 간격을 그대로 쓴다. 상한 자체는 남겨야
+            // 한다 — 컴파일이나 임포트로 몇 초씩 멈춘 뒤 그만큼을 한 번에
+            // 반영하면 구름이 순간이동한다.
+            float dt = Application.isPlaying
+                ? Time.deltaTime
+                : Mathf.Clamp(Time.realtimeSinceStartup - _lastTime, 0f, 0.5f);
+            _lastTime = Time.realtimeSinceStartup;
+
+            var dir = driftDirection.sqrMagnitude > 1e-6f
+                ? driftDirection.normalized
+                : Vector2.right;
+
+            _drift += dir * driftSpeed * dt;
+
+            // 무한히 키우지 않는다. 노이즈가 반복되는 주기보다 훨씬 큰
+            // 값에서 감아 주면 눈에 안 띄면서 float 정밀도가 안 깨진다.
+            // 10만 m 쯤 가면 소수점 아래가 뭉개져 구름이 계단처럼 튄다.
+            const float Wrap = 100000f;
+            _drift.x = Mathf.Repeat(_drift.x, Wrap);
+            _drift.y = Mathf.Repeat(_drift.y, Wrap);
+
+            moved = true;
+        }
+        else
+        {
+            _lastTime = Time.realtimeSinceStartup;
+        }
+
+        // Transform 은 인스펙터 밖(씬 뷰 드래그, Animation)에서도 바뀌므로
         // OnValidate 만으로는 못 따라간다.
-        if (transform.hasChanged) { Apply(); transform.hasChanged = false; }
+        if (transform.hasChanged) { moved = true; transform.hasChanged = false; }
+
+        if (moved) Apply();
     }
 
     void Resolve()
@@ -122,9 +220,12 @@ public class CloudLayerHandle : MonoBehaviour
 
         if (driveOffset)
         {
+            // 기준점(Transform) + 드리프트 누적. 더하기라 Animation 이
+            // position 을 움직여도 흐름이 지워지지 않는다.
+            //
             // 세로 성분은 고도가 담당하므로 0 으로 둔다. 여기에 y 를 넣으면
             // 고도와 이중으로 걸려 오브젝트를 올릴 때 두 배로 움직인다.
-            SetVec3("shapeOffset", new Vector3(p.x, 0f, p.z));
+            SetVec3("shapeOffset", new Vector3(p.x + _drift.x, 0f, p.z + _drift.y));
         }
 
         if (driveOrientation)
@@ -151,7 +252,15 @@ public class CloudLayerHandle : MonoBehaviour
 
         var p = transform.position;
         if (TryGet("bottomAltitude", out float alt)) p.y = alt;
-        if (TryGetVec3("shapeOffset", out var off)) { p.x = off.x; p.z = off.z; }
+
+        // 프로파일에 든 오프셋은 기준점 + 드리프트다. 그대로 위치에 넣으면
+        // 흘러간 만큼이 기준점으로 굳어서, 되읽기를 누를 때마다 구름이
+        // 점점 멀어진다. 드리프트를 빼고 기준점만 되돌린다.
+        if (TryGetVec3("shapeOffset", out var off))
+        {
+            p.x = off.x - _drift.x;
+            p.z = off.z - _drift.y;
+        }
         transform.position = p;
 
         if (TryGet("altitudeRange", out float r))      thickness    = r;

@@ -369,7 +369,7 @@ MonoBehaviour:
     m_Value: 0
   globalSpeed:
     m_OverrideState: 1
-    m_Value: 7.5
+    m_Value: 2.5
   globalOrientation:
     m_OverrideState: 1
     m_Value: 180

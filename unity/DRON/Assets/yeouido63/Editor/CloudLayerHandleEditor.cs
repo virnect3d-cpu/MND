@@ -28,11 +28,37 @@ public class CloudLayerHandleEditor : Editor
         }
 
         var p = h.transform.position;
+
+        string drift;
+        if (h.driftSpeed <= 0f)
+        {
+            drift = "드리프트 꺼짐 — 제자리에서 뭉개지기만 한다";
+        }
+        else
+        {
+            var d = h.driftDirection.sqrMagnitude > 1e-6f
+                ? h.driftDirection.normalized : Vector2.right;
+            // 방향을 말로 풀어 준다. 숫자만 보면 어느 쪽인지 안 읽힌다.
+            string axis = Mathf.Abs(d.x) >= Mathf.Abs(d.y)
+                ? (d.x >= 0f ? "+X" : "-X")
+                : (d.y >= 0f ? "+Z" : "-Z");
+            drift = $"드리프트 {h.driftSpeed:F1} m/s → {axis} ({d.x:F2}, {d.y:F2})";
+        }
+
         EditorGUILayout.HelpBox(
             $"구름층 {p.y:F0} ~ {p.y + h.thickness:F0} m\n" +
-            $"수평 오프셋 ({p.x:F0}, {p.z:F0}) m\n" +
-            $"짙기 {h.density:F2} · 속도 {h.speed:F1}",
+            $"기준 오프셋 ({p.x:F0}, {p.z:F0}) m\n" +
+            $"{drift}\n" +
+            $"짙기 {h.density:F2} · 굴러가는 속도 {h.speed:F1}",
             MessageType.Info);
+
+        if (h.driftSpeed > 0f && h.speed > 4f)
+        {
+            EditorGUILayout.HelpBox(
+                "드리프트를 켠 상태에서 '굴러가는 속도'가 높으면 흐르는 방향이 " +
+                "모양 변화에 묻힌다. 2~3 정도가 방향이 또렷하다.",
+                MessageType.Warning);
+        }
 
         using (new EditorGUILayout.HorizontalScope())
         {

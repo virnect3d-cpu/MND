@@ -54,7 +54,7 @@ public static class SetupDustParticles
     const string MatPath  = TexDir + "/M_DustParticle.mat";
     const string HazeMat  = TexDir + "/M_DustHaze.mat";
 
-    // 속력 범위는 여기서 정하고, 방향은 SyncWind.WindAngleDeg 하나로
+    // 속력 범위는 여기서 정하고, 방향은 SyncWind.Angle 하나로
     // 결정한다. 예전엔 여기에 45 도 성분을 숫자로 박아 뒀는데, 그러면
     // SyncWind 에서 각도를 바꿔도 먼지만 옛 방향에 남는다.
     public const float SpeedMin = 9.3f;
@@ -116,7 +116,7 @@ public static class SetupDustParticles
         AssetDatabase.SaveAssets();
 
         Debug.Log($"[먼지] 카메라({cam.name}) 자식으로 3 층 {total}개 심음. " +
-                  $"Soft Particles 켬, 바람 {SyncWind.WindAngleDeg}도 {WindSpeed:F1} m/s.");
+                  $"Soft Particles 켬, 바람 {SyncWind.Angle}도 {WindSpeed:F1} m/s.");
     }
 
     // ── 1층 HAZE ────────────────────────────────────────────────────────
@@ -135,12 +135,17 @@ public static class SetupDustParticles
         main.loop = true;
         main.startLifetime = new ParticleSystem.MinMaxCurve(7f, 12f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.5f);
-        // 크게. 알갱이로 보이면 안 되므로 알파를 0.05 수준으로 눌러 둔다.
+        // 크게. 알갱이로 보이면 안 되므로 알파를 아주 낮게 눌러 둔다.
+        //
+        //   0.035~0.075 는 진했다. 시트가 6~16m 라 화면에서 여러 장이
+        //   겹치는데, 한 장의 알파가 낮아도 겹친 수만큼 누적된다.
+        //   90 장이 돌아다니므로 시야에 서너 장만 겹쳐도 체감 농도는
+        //   서너 배가 된다. 절반 아래로 내린다.
         main.startSize = new ParticleSystem.MinMaxCurve(6f, 16f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
         main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(0.76f, 0.76f, 0.77f, 0.075f),
-            new Color(0.62f, 0.62f, 0.65f, 0.035f));
+            new Color(0.76f, 0.76f, 0.77f, 0.032f),
+            new Color(0.62f, 0.62f, 0.65f, 0.015f));
         main.maxParticles = Count;
         main.gravityModifier = 0f;
         main.simulationSpace = ParticleSystemSimulationSpace.World;
@@ -352,16 +357,26 @@ public static class SetupDustParticles
     // cos/sin 에 속력 범위를 곱해서 만든다. 배율로 층마다 세기를 바꾼다.
     static void WindVelocity(ParticleSystem ps, float lo, float hi, float yMin, float yMax)
     {
-        float rad = SyncWind.WindAngleDeg * Mathf.Deg2Rad;
+        float rad = SyncWind.Angle * Mathf.Deg2Rad;
         float cx = Mathf.Cos(rad), cz = Mathf.Sin(rad);
 
         var vel = ps.velocityOverLifetime;
         vel.enabled = true;
         vel.space = ParticleSystemSimulationSpace.World;
-        vel.x = new ParticleSystem.MinMaxCurve(SpeedMin * cx * lo, SpeedMax * cx * hi);
+        vel.x = Range(SpeedMin * cx * lo, SpeedMax * cx * hi);
         vel.y = new ParticleSystem.MinMaxCurve(yMin, yMax);
-        vel.z = new ParticleSystem.MinMaxCurve(SpeedMin * cz * lo, SpeedMax * cz * hi);
+        vel.z = Range(SpeedMin * cz * lo, SpeedMax * cz * hi);
     }
+
+    // 두 값을 크기 순으로 정렬해 MinMaxCurve 를 만든다.
+    //
+    //   성분이 음수인 방향(90도 초과)에서는 곱셈 결과의 순서가 뒤집힌다.
+    //   270 도(-Z)면 z 가 (-5.12, -23.23) 이 되어 min > max 다. 그대로
+    //   넘기면 Unity 가 범위를 거꾸로 해석해 먼지가 엉뚱하게 흐르거나
+    //   아예 안 움직인다 — 방향을 180 도 너머로 돌려야 드러나는 버그라
+    //   30 도로 테스트하는 동안에는 보이지 않았다.
+    static ParticleSystem.MinMaxCurve Range(float a, float b)
+        => new ParticleSystem.MinMaxCurve(Mathf.Min(a, b), Mathf.Max(a, b));
 
     // 수명 양끝에서 서서히 나타나고 사라지게 — 안 그러면 팝 하고 튄다
     static void FadeInOut(ParticleSystem ps, float inT, float outT)

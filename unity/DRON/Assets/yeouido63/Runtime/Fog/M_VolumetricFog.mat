@@ -42,6 +42,6 @@ Material:
     m_Colors:
     - _Color: {r: 0.63, g: 0.64, b: 0.66, a: 1}
     - _LightContribution: {r: 0.32, g: 0.32, b: 0.33, a: 1}
-    - _WindDir: {r: 0.8660254, g: 0, b: 0.5, a: 0}
+    - _WindDir: {r: 0.000000011924881, g: 0, b: -1, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

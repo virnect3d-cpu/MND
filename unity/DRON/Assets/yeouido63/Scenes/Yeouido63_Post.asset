@@ -369,10 +369,10 @@ MonoBehaviour:
     m_Value: 0
   globalSpeed:
     m_OverrideState: 1
-    m_Value: 4.8
+    m_Value: 7.5
   globalOrientation:
     m_OverrideState: 1
-    m_Value: 60
+    m_Value: 180
   shapeSpeedMultiplier:
     m_OverrideState: 1
     m_Value: 1

@@ -38,12 +38,37 @@ public static class SyncWind
 
     // 바람 방향 — XZ 평면 각도. 0 도면 순수 +X, 90 도면 순수 +Z 다.
     //
-    //   19 도는 거의 가로로만 흘러 깊이감이 없었고, 45 도는 X 와 Z 가
-    //   같은 비중이라 Z 축으로 가는 것처럼 보였다. 30 도면 X 가 Z 의
-    //   1.73 배라 X 축 방향이 분명하면서 안쪽으로 밀리는 느낌도 남는다.
+    //     0도 = +X      90도 = +Z     180도 = -X     270도 = -Z
+    //
+    //   지금까지 19 -> 45 -> 30 을 거쳤다. 셋 다 +Z 성분이 있어서 화면
+    //   안쪽으로 밀려 들어갔는데, 요청은 -Z 로 흐르는 것이라 270 도다.
+    //   순수 -Z 라 X 성분이 0 이고, 카메라 쪽으로 곧장 밀려 나온다.
     //
     //   여기 한 값만 바꾸면 먼지/잔디/안개/구름이 모두 따라온다.
-    public const float WindAngleDeg = 30f;
+    //   눈으로 보며 고르려면 Tools/Yeouido 63/바람 방향 조절 을 써라.
+    public const float WindAngleDeg = 270f;
+
+    // 실제로 쓰이는 각도.
+    //
+    //   기본은 위 const 지만 WindAnglePicker 가 이걸 덮어써서 리컴파일
+    //   없이 방향을 돌린다. const 는 컴파일 시점에 박히므로 런타임에
+    //   바꿀 수가 없어서 변수를 따로 뒀다.
+    //
+    //   SessionState 에 넣는다. 정적 필드만 쓰면 스크립트가 리로드될 때
+    //   초기화돼서, 각도를 바꿔 놓고 코드를 한 번 건드리면 조용히 기본값으로
+    //   돌아간다 — 왜 되돌아갔는지 찾기 어려운 종류의 버그다.
+    const string AngleKey = "yeouido63.windAngle";
+    public static float Angle
+    {
+        get => SessionState.GetFloat(AngleKey, WindAngleDeg);
+        set => SessionState.SetFloat(AngleKey, value);
+    }
+
+    public static void ApplyAngle(float deg)
+    {
+        Angle = deg;
+        Run();
+    }
 
     [DidReloadScripts]
     static void OnReload()
@@ -59,7 +84,7 @@ public static class SyncWind
     [MenuItem("Tools/Yeouido 63/바람 동기화")]
     public static void Run()
     {
-        float rad = WindAngleDeg * Mathf.Deg2Rad;
+        float rad = Angle * Mathf.Deg2Rad;
         var dir = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
         float speed = SetupDustParticles.WindSpeed;              // m/s
 
@@ -108,14 +133,14 @@ public static class SyncWind
             // 실제로도 큰 기단은 알갱이보다 천천히 움직이는 것처럼 보인다.
             fog.SetFloat("_WindSpeed", speed * 0.5f);
             EditorUtility.SetDirty(fog);
-            Debug.Log($"[바람] 안개: dir {WindAngleDeg}도, _WindSpeed={speed * 0.5f:F2}");
+            Debug.Log($"[바람] 안개: dir {Angle}도, _WindSpeed={speed * 0.5f:F2}");
         }
 
         // --- 구름 ---
         SyncClouds(speed);
 
         AssetDatabase.SaveAssets();
-        Debug.Log($"[바람] 완료. 기준 풍속 {speed:F2} m/s, 방향 {WindAngleDeg}도.");
+        Debug.Log($"[바람] 완료. 기준 풍속 {speed:F2} m/s, 방향 {Angle}도.");
     }
 
     static void SyncClouds(float speed)
@@ -135,9 +160,9 @@ public static class SyncWind
             // 이 변환을 빼먹으면 구름만 엉뚱한 데로 흐른다.
             //
             // 0~360 으로 감아 준다. 이 파라미터는 ClampedFloatParameter(0,360)
-            // 이라 음수면 0 으로 잘린다 — WindAngleDeg 가 90 을 넘으면
+            // 이라 음수면 0 으로 잘린다 — 각도가 90 을 넘으면
             // 90-각도가 음수가 되므로 감지 않으면 구름만 엉뚱한 데로 흐른다.
-            float compass = Mathf.Repeat(90f - WindAngleDeg, 360f);
+            float compass = Mathf.Repeat(90f - Angle, 360f);
             SetParam(so, "globalOrientation", compass);
 
             // 속도. 배율이라 m/s 로 환산할 근거가 없다.
@@ -151,7 +176,9 @@ public static class SyncWind
             //   속도를 올릴 수 있는 건 사실상 이것뿐이다. 아래 두 배율은
             //   상한이 1.0 이라(VolumetricCloudsVolume.cs 참고) 거기서
             //   더 빠르게 만들 수 없다. globalSpeed 가 전체를 곱한다.
-            const float GlobalSpeed = 4.8f;
+            //   FloatParameter 라 상한이 없어서 여기는 얼마든 올릴 수 있다.
+            //   (1.2 -> 4.8 -> 7.5)
+            const float GlobalSpeed = 7.5f;
             SetParam(so, "globalSpeed", GlobalSpeed);
 
             // 자전 — 구름이 흐르기만 하고 모양이 그대로면 판때기가

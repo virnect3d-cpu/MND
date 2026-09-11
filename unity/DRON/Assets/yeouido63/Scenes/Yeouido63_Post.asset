@@ -222,13 +222,13 @@ MonoBehaviour:
     m_Value: 1
   localClouds:
     m_OverrideState: 1
-    m_Value: 0
+    m_Value: 1
   m_CloudPreset:
     m_OverrideState: 0
     m_Value: 1
   densityMultiplier:
     m_OverrideState: 1
-    m_Value: 0.22
+    m_Value: 0.14
   densityCurve:
     m_OverrideState: 0
     m_Value:
@@ -356,11 +356,11 @@ MonoBehaviour:
     m_OverrideState: 0
     m_Value: 200
   bottomAltitude:
-    m_OverrideState: 0
-    m_Value: 1200
+    m_OverrideState: 1
+    m_Value: 250
   altitudeRange:
-    m_OverrideState: 0
-    m_Value: 2000
+    m_OverrideState: 1
+    m_Value: 120
   shapeOffset:
     m_OverrideState: 0
     m_Value: {x: 0, y: 0, z: 0}
@@ -369,7 +369,7 @@ MonoBehaviour:
     m_Value: 0
   globalSpeed:
     m_OverrideState: 1
-    m_Value: 2.5
+    m_Value: 1.2
   globalOrientation:
     m_OverrideState: 0
     m_Value: 0

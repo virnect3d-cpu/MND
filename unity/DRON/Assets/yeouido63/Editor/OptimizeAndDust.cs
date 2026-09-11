@@ -179,16 +179,22 @@ public static class OptimizeAndDust
         var mat = AssetDatabase.LoadAssetAtPath<Material>(FogMatPath);
         if (mat == null) { Debug.LogError("[황사] 포그 머티리얼 없음: " + FogMatPath); return; }
 
-        // 누런 모래빛. 순수 노랑이면 만화처럼 보여서 채도를 낮춘 베이지로 간다.
-        mat.SetColor("_Color", new Color(0.76f, 0.66f, 0.47f, 1f));
+        // 회색 먼지.
+        //   처음엔 누런 모래빛(0.76, 0.66, 0.47)으로 갔는데 화면이 전체적으로
+        //   세피아 필터를 씌운 것처럼 보였다. 도시 미세먼지 쪽에 가깝게
+        //   중성 회색으로 뺀다. 완전 무채색이면 죽어 보여서 아주 살짝만
+        //   푸른기를 남긴다 — 대기 산란이 짧은 파장을 더 남기기 때문이다.
+        mat.SetColor("_Color", new Color(0.63f, 0.64f, 0.66f, 1f));
 
         // 태양 쪽이 뿌옇게 빛나는 게 황사의 핵심 인상이다.
         //
         //   값이 작아 보이지만 henyey_greenstein 은 전방 산란 각도에서 수십까지
         //   튄다(_LightScattering 이 클수록 더). 1.15 를 넣었다가 화면이 하얗게
         //   날아갔다. 0.35 정도가 태양 주변만 은은하게 밝아지는 지점이다.
+        //   회색 먼지에 맞춰 산란광도 중성으로 뺀다. 여기만 누런 채로 두면
+        //   태양 쪽만 노랗게 떠서 안개 색과 어긋난다.
         if (mat.HasProperty("_LightContribution"))
-            mat.SetColor("_LightContribution", new Color(0.35f, 0.30f, 0.21f, 1f));
+            mat.SetColor("_LightContribution", new Color(0.32f, 0.32f, 0.33f, 1f));
 
         // 위상함수 첨예도. 0.55 는 태양 쪽 피크가 날카로워 쉽게 과포화된다.
         if (mat.HasProperty("_LightScattering")) mat.SetFloat("_LightScattering", 0.35f);
@@ -222,7 +228,11 @@ public static class OptimizeAndDust
         //     800m        0.38
         //     1200m       0.23  — 여기서 Linear 안개가 이어받는다
         //   원하던 "옥상은 보이고 멀리는 뿌연" 그림이 이 구간에서 나온다.
-        if (mat.HasProperty("_DensityMultiplier")) mat.SetFloat("_DensityMultiplier", 0.9f);
+        //   색을 회색으로 뺀 뒤 0.9 로는 원경이 너무 맑아졌다(하늘이 그냥
+        //   파랗게 보였다). 누런색일 때는 색 자체가 눈에 띄어 같은 농도라도
+        //   짙어 보였던 것. 1.15 로 올려 뿌연 느낌을 되살린다.
+        //   투과율 300m 0.63 / 800m 0.29 / 1200m 0.16
+        if (mat.HasProperty("_DensityMultiplier")) mat.SetFloat("_DensityMultiplier", 1.15f);
         if (mat.HasProperty("_DensityThreshold"))  mat.SetFloat("_DensityThreshold", 0.46f);
         if (mat.HasProperty("_NoiseTiling"))       mat.SetFloat("_NoiseTiling", 0.55f);
         if (mat.HasProperty("_NoiseOffset"))       mat.SetFloat("_NoiseOffset", 1f);
@@ -275,7 +285,9 @@ public static class OptimizeAndDust
             // 걸린다. 1800m 로 밀어 건물 전체가 안개 밖에 있게 한다.
             RenderSettings.fogEndDistance   = 7000f;
             RenderSettings.fogStartDistance = 1800f;
-            RenderSettings.fogColor = new Color(0.78f, 0.71f, 0.56f, 1f);   // 황사와 같은 계열
+            // 볼류메트릭 쪽과 같은 회색 계열. 둘이 다르면 1200m 경계에서
+            // 색이 바뀌는 게 보인다.
+            RenderSettings.fogColor = new Color(0.66f, 0.67f, 0.69f, 1f);
 
             Debug.Log($"[황사] Linear 안개 start {beforeStart} -> 900 / end {beforeEnd} -> 7000, 색 맞춤");
         }

@@ -48,6 +48,21 @@ public static class CaptureGameView
             antiAliasing = 1     // 결과를 읽어야 하므로 MSAA RT 는 피한다
         };
 
+        // 파티클을 먼저 시뮬레이션한다.
+        //
+        //   에디터 비플레이 모드에서는 시간이 흐르지 않아 파티클이 0 개인
+        //   상태로 찍힌다. cam.Render() 는 그 순간을 그릴 뿐이라 아무리
+        //   다시 찍어도 파티클은 안 나온다 — 실제로 "안 보인다" 는 판단을
+        //   여기서 잘못 내릴 뻔했다.
+        //   Simulate(t, withChildren, restart) 로 t 초가 지난 상태를 만든다.
+        int psCount = 0;
+        foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+        {
+            ps.Simulate(4f, true, true);
+            psCount++;
+        }
+        if (psCount > 0) Debug.Log($"[캡처] 파티클 시스템 {psCount}개를 4초 시뮬레이션했다.");
+
         var prev = cam.targetTexture;
         var prevActive = RenderTexture.active;
         try
@@ -73,6 +88,15 @@ public static class CaptureGameView
             RenderTexture.active = prevActive;
             rt.Release();
             Object.DestroyImmediate(rt);
+
+            // 시뮬레이션 상태를 씬에 남기지 않는다. 안 되돌리면 에디터에
+            // 파티클이 멈춘 채 박혀 있고, 그대로 씬을 저장하면 그 상태가
+            // 커밋에 섞인다.
+            foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+            {
+                ps.Clear(true);
+                ps.Play(true);
+            }
         }
     }
 }

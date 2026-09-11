@@ -36,14 +36,23 @@ public static class SetupDustParticles
     const string MatPath  = TexDir + "/M_DustParticle.mat";
 
     // 카메라를 둘러싼 박스. 이 안에서만 먼지가 돈다.
-    static readonly Vector3 BoxSize = new Vector3(34f, 18f, 34f);
+    //
+    //   34x18x34 로 잡았더니 먼지가 하늘 쪽(=멀고 높은 곳)에만 보였다.
+    //   박스가 카메라 중심이라 절반이 뒤쪽에 뿌려지고, 앞쪽 입자도 화면
+    //   가운데(밝은 잔디)에서는 대비가 낮아 묻혔기 때문이다.
+    //   박스를 납작하게(높이 18 -> 11) 줄여 시선 높이에 모으고, 아래 shape
+    //   위치에서 카메라 앞쪽으로 밀어 화면을 가로지르게 한다.
+    static readonly Vector3 BoxSize = new Vector3(30f, 11f, 30f);
 
     // "휭휭" 날아가는 강풍 황사.
     //   빠르게 흐르면 한 알이 화면에 머무는 시간이 짧아진다. 그래서 수명을
     //   줄이는 대신 방출량을 크게 올려야 화면 밀도가 유지된다.
-    //   수명 5.5 -> 2.6 초, 방출 90 -> 260/s, 상한 420 -> 700.
-    const int   MaxParticles = 700;
-    const float Rate         = 260f;
+    //
+    //   개수를 다시 크게 올렸다(700 -> 2600, 방출 260 -> 900/s).
+    //   빌보드 파티클은 정점 8개짜리라 수천 개도 드로우콜 하나로 나간다.
+    //   비용은 개수보다 화면을 덮는 픽셀 면적(오버드로)이 지배한다.
+    const int   MaxParticles = 2600;
+    const float Rate         = 900f;
     const float LifeTime     = 2.6f;
 
     [DidReloadScripts]
@@ -85,12 +94,21 @@ public static class SetupDustParticles
         main.loop = true;
         main.startLifetime = new ParticleSystem.MinMaxCurve(LifeTime * 0.6f, LifeTime);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.25f, 1.1f);
-        // 크기를 아주 작게 — 알갱이지 눈송이가 아니다
-        main.startSize = new ParticleSystem.MinMaxCurve(0.025f, 0.085f);
+        // 크기.
+        //   0.025~0.085m 로 잡았더니 눈에 안 보였다. 720p / FOV 60 기준으로
+        //   5m 거리에서 3~10px, 15m 에서는 1~3px 밖에 안 된다. 거기에 알파
+        //   0.16~0.30 이 곱해지고 텍스처 알파도 중심에서 제곱으로 떨어지니
+        //   실효 알파가 0.1 미만 — 사실상 투명한 점이었다.
+        //   0.09~0.26m 로 키운다. 5m 에서 11~32px 로 확실히 읽힌다.
+        main.startSize = new ParticleSystem.MinMaxCurve(0.09f, 0.26f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+
+        // 색 — 누런 황사가 아니라 회색 먼지.
+        //   알파도 같이 올린다(0.16~0.30 -> 0.38~0.62). 크기만 키우고 알파를
+        //   두면 여전히 흐릿하다. 둘 다 곱해져서 보이는 것이라 함께 올려야 한다.
         main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(0.80f, 0.70f, 0.50f, 0.30f),
-            new Color(0.88f, 0.79f, 0.60f, 0.16f));
+            new Color(0.72f, 0.72f, 0.73f, 0.62f),
+            new Color(0.58f, 0.58f, 0.60f, 0.38f));
         main.maxParticles = MaxParticles;
         main.gravityModifier = 0.008f;              // 거의 안 떨어진다. 공기에 떠 있는 것
         main.simulationSpace = ParticleSystemSimulationSpace.World;
@@ -103,16 +121,15 @@ public static class SetupDustParticles
 
         // 카메라를 감싸는 박스에서 방출한다.
         //
-        //   박스를 바람이 불어오는 쪽(-X)으로 밀어 둔다. 정중앙에서 뿌리면
-        //   강풍이라 입자가 순식간에 +X 로 빠져나가 카메라 앞이 빈다.
-        //   상류에서 뿌려야 화면을 가로질러 지나간다.
-        //   박스는 월드 축 기준이 아니라 카메라 로컬이지만, 이 씬은 카메라가
-        //   거의 수평이라 문제되지 않는다.
+        //   박스는 카메라 로컬이다. 그래서 +Z 가 카메라가 보는 방향이다.
+        //   앞쪽(+Z)으로 밀어야 화면 안에서 먼지가 돈다. 중심에 두면 절반이
+        //   카메라 뒤에 뿌려져 그냥 버려진다.
+        //   X 는 바람 상류(-X)로 조금 밀어 화면을 가로질러 흐르게 한다.
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Box;
         shape.scale = BoxSize;
-        shape.position = new Vector3(-BoxSize.x * 0.3f, 0f, 0f);
+        shape.position = new Vector3(-BoxSize.x * 0.25f, 0f, BoxSize.z * 0.35f);
 
         // 바람 — 볼류메트릭 안개와 같은 방향(+X, 약간 +Z)으로 흘려야
         // 둘이 따로 노는 것처럼 보이지 않는다.

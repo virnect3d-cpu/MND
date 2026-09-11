@@ -108,7 +108,23 @@ Shader "Yeouido63/VolumetricFog"
                 density *= exp(-max(0.0, worldPos.y - _HeightBase) * _HeightFalloff);
 
                 density = saturate(density - _DensityThreshold) * _DensityMultiplier;
-                return density;
+
+                // 미터 단위 소광계수로 환산한다.
+                //
+                //   투과율은 exp(-density * 거리[m]) 로 계산된다. 그래서 density
+                //   는 "미터당" 소광계수다. 여기 들어오는 값이 0.14 만 돼도
+                //   7m 마다 빛이 1/e 로 줄어든다는 뜻이라, 2600m 를 행군하면
+                //   투과율이 0 이 된다 — 실제로 화면이 베이지 단색으로 덮였다.
+                //
+                //   현실의 황사는 가시거리가 1~2km 수준이고 그때 소광계수는
+                //   대략 0.002~0.004 /m 다. 슬라이더를 0~1 범위로 쓰면서 이
+                //   영역에 닿게 하려면 1/400 쯤으로 눌러야 한다.
+                //
+                //   슬라이더 의미를 바꾸는 대신 여기서 환산하는 이유 —
+                //   _DensityMultiplier 를 0.0008 같은 값으로 두면 인스펙터에서
+                //   사실상 조절이 불가능해진다.
+                const float METERS_PER_UNIT = 1.0 / 400.0;
+                return density * METERS_PER_UNIT;
             }
 
             half4 frag(Varyings IN) : SV_Target
@@ -143,7 +159,18 @@ Shader "Yeouido63/VolumetricFog"
                     pixelCoords, (int)(_Time.y / max(HALF_EPS, unity_DeltaTime.x))) * _NoiseOffset;
 
                 float transmittance = 1;
-                float4 fogCol = _Color;
+
+                // 산란광을 따로 모은다.
+                //
+                //   원래는 fogCol.rgb 에 그대로 더하면서 stepSize 까지 곱했다.
+                //   stepSize 가 18m 라 스텝마다 18 배씩 쌓여서, 스텝이 많아질수록
+                //   화면이 하얗게 날아갔다(_LightContribution 이 1 근처면 즉시 폭발).
+                //   그 식은 _LightContribution 이 0.01 수준일 때만 성립한다.
+                //
+                //   여기서는 각 스텝의 기여를 "그 지점까지의 투과율 x 그 스텝에서
+                //   흡수된 양" 으로 가중해 더한다. 흡수량의 총합이 1 을 넘지
+                //   않으므로 스텝 수나 크기를 바꿔도 밝기가 흔들리지 않는다.
+                float3 scattered = 0;
 
                 [loop]
                 for (int i = 0; i < MAX_STEPS; i++)
@@ -156,16 +183,31 @@ Shader "Yeouido63/VolumetricFog"
                     if (density > 0)
                     {
                         Light mainLight = GetMainLight(TransformWorldToShadowCoord(rayPos));
-                        fogCol.rgb += mainLight.color.rgb * _LightContribution.rgb
-                                    * henyey_greenstein(dot(rayDir, mainLight.direction), _LightScattering)
-                                    * density * mainLight.shadowAttenuation * stepSize;
-                        transmittance *= exp(-density * stepSize);
+
+                        // 이 스텝에서 빠져나간 빛의 비율 (0~1)
+                        float stepTrans = exp(-density * stepSize);
+                        float absorbed  = transmittance * (1.0 - stepTrans);
+
+                        float phase = henyey_greenstein(dot(rayDir, mainLight.direction), _LightScattering);
+
+                        scattered += mainLight.color.rgb * _LightContribution.rgb
+                                   * phase * mainLight.shadowAttenuation * absorbed;
+
+                        transmittance *= stepTrans;
                     }
 
                     distTravelled += stepSize;
+
+                    // 거의 다 막혔으면 더 행군해도 화면에 변화가 없다
+                    if (transmittance < 0.01) break;
                 }
 
-                return lerp(col, fogCol, 1.0 - saturate(transmittance));
+                float fogAmount = 1.0 - saturate(transmittance);
+
+                // 안개 자체 색 + 그 안에서 산란된 햇빛
+                float3 fogRGB = _Color.rgb + scattered;
+
+                return float4(lerp(col.rgb, fogRGB, fogAmount), col.a);
             }
             ENDHLSL
         }

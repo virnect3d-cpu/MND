@@ -183,20 +183,46 @@ public static class OptimizeAndDust
         mat.SetColor("_Color", new Color(0.76f, 0.66f, 0.47f, 1f));
 
         // 태양 쪽이 뿌옇게 빛나는 게 황사의 핵심 인상이다.
+        //
+        //   값이 작아 보이지만 henyey_greenstein 은 전방 산란 각도에서 수십까지
+        //   튄다(_LightScattering 이 클수록 더). 1.15 를 넣었다가 화면이 하얗게
+        //   날아갔다. 0.35 정도가 태양 주변만 은은하게 밝아지는 지점이다.
         if (mat.HasProperty("_LightContribution"))
-            mat.SetColor("_LightContribution", new Color(1.15f, 1.00f, 0.72f, 1f));
-        if (mat.HasProperty("_LightScattering")) mat.SetFloat("_LightScattering", 0.55f);
+            mat.SetColor("_LightContribution", new Color(0.35f, 0.30f, 0.21f, 1f));
 
-        // 거리/스텝 — 63빌딩 주변 도시가 들어오는 범위.
-        // StepSize 를 키우면 싸지지만 밴딩이 생긴다. 18m 가 타협점.
-        if (mat.HasProperty("_MaxDistance"))       mat.SetFloat("_MaxDistance", 2600f);
-        if (mat.HasProperty("_StepSize"))          mat.SetFloat("_StepSize", 18f);
+        // 위상함수 첨예도. 0.55 는 태양 쪽 피크가 날카로워 쉽게 과포화된다.
+        if (mat.HasProperty("_LightScattering")) mat.SetFloat("_LightScattering", 0.35f);
 
-        // 1.35 / 0.32 로 처음 넣었더니 너무 짙었다. 40% 덜어낸다.
-        //   밀도 1.35 -> 0.81 (0.6 배)
-        //   임계값 0.32 -> 0.46 — 옅은 부분을 아예 잘라내야 "덜어낸" 느낌이 난다.
-        //     밀도만 낮추면 전체가 균일하게 흐려질 뿐 뿌연 인상은 그대로다.
-        if (mat.HasProperty("_DensityMultiplier")) mat.SetFloat("_DensityMultiplier", 0.81f);
+        // 거리/스텝 — 여기가 비용을 결정한다.
+        //
+        //   레이마칭 비용 = 픽셀 수 x 스텝 수이고, 스텝 수는 대략
+        //   _MaxDistance / _StepSize 다. 2600/18 = 144 스텝은 전체 화면에
+        //   깔기엔 무겁다.
+        //
+        //   1200m 로 줄인다. 이 거리면 63빌딩 주변 블록까지는 황사가 덮이고
+        //   그 너머는 Linear 안개(더 싸다)가 이어받는다. 두 안개의 색을
+        //   맞춰 놨으므로 경계가 눈에 띄지 않는다.
+        //   스텝은 22m 로 키워 스텝 수를 144 -> 55 로 떨어뜨린다. 밀도가
+        //   낮아서(소광계수 0.0008/m) 이 정도 간격에선 밴딩이 안 보인다.
+        if (mat.HasProperty("_MaxDistance"))       mat.SetFloat("_MaxDistance", 1200f);
+        if (mat.HasProperty("_StepSize"))          mat.SetFloat("_StepSize", 22f);
+
+        // 농도.
+        //
+        //   1.35 -> 0.81 -> 0.34 로 계속 낮췄는데도 화면이 베이지 단색으로
+        //   덮였다. 농도 문제가 아니라 **단위가 틀린 것**이었다.
+        //   density 는 투과율 exp(-density * 거리[m]) 에 들어가므로 미터당
+        //   소광계수인데, 0.14 만 돼도 7m 마다 빛이 1/e 로 준다. 2.6km 를
+        //   행군하면 투과율이 0 이 될 수밖에 없다.
+        //   셰이더에서 1/400 로 환산하도록 고쳤다(get_density 주석 참고).
+        //
+        //   그 환산 위에서 고른 값이다. _MaxDistance 를 2600 -> 1200 으로
+        //   줄이면서 같은 두께를 내려고 0.6 -> 0.9 로 올렸다. 투과율은
+        //     300m(옥상)  0.69  — 또렷하게 보인다
+        //     800m        0.38
+        //     1200m       0.23  — 여기서 Linear 안개가 이어받는다
+        //   원하던 "옥상은 보이고 멀리는 뿌연" 그림이 이 구간에서 나온다.
+        if (mat.HasProperty("_DensityMultiplier")) mat.SetFloat("_DensityMultiplier", 0.9f);
         if (mat.HasProperty("_DensityThreshold"))  mat.SetFloat("_DensityThreshold", 0.46f);
         if (mat.HasProperty("_NoiseTiling"))       mat.SetFloat("_NoiseTiling", 0.55f);
         if (mat.HasProperty("_NoiseOffset"))       mat.SetFloat("_NoiseOffset", 1f);
@@ -244,8 +270,11 @@ public static class OptimizeAndDust
             // 볼류메트릭 황사가 거리감을 담당하므로 기존 Linear 안개는 물러난다.
             // Mathf.Max 를 쓰면 재실행할 때마다 값이 커지기만 해서 되돌릴 수
             // 없다. 고정값을 그대로 넣는다.
+            // 카메라가 지상(Y 1.75m)이라 63빌딩을 올려다보는 구도다. 옥상까지의
+            // 거리가 300m 를 훌쩍 넘으므로 start 가 900m 라도 안개가 옥상에
+            // 걸린다. 1800m 로 밀어 건물 전체가 안개 밖에 있게 한다.
             RenderSettings.fogEndDistance   = 7000f;
-            RenderSettings.fogStartDistance = 900f;   // 가까운 건물이 뿌예지지 않게
+            RenderSettings.fogStartDistance = 1800f;
             RenderSettings.fogColor = new Color(0.78f, 0.71f, 0.56f, 1f);   // 황사와 같은 계열
 
             Debug.Log($"[황사] Linear 안개 start {beforeStart} -> 900 / end {beforeEnd} -> 7000, 색 맞춤");

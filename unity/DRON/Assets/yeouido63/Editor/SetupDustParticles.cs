@@ -48,11 +48,16 @@ public static class SetupDustParticles
     //   빠르게 흐르면 한 알이 화면에 머무는 시간이 짧아진다. 그래서 수명을
     //   줄이는 대신 방출량을 크게 올려야 화면 밀도가 유지된다.
     //
-    //   개수를 다시 크게 올렸다(700 -> 2600, 방출 260 -> 900/s).
+    //   개수를 다시 크게 올렸다(700 -> 2600 -> 6000, 방출 260 -> 900 -> 2100/s).
     //   빌보드 파티클은 정점 8개짜리라 수천 개도 드로우콜 하나로 나간다.
     //   비용은 개수보다 화면을 덮는 픽셀 면적(오버드로)이 지배한다.
-    const int   MaxParticles = 2600;
-    const float Rate         = 900f;
+    //
+    //   그래서 크기를 줄인 지금은 오히려 여유가 생겼다. 입자 지름을 1/3 로
+    //   줄이면 덮는 면적은 1/9 이라, 개수를 2.3 배 올려도 총 오버드로는
+    //   예전의 4분의 1 수준이다. 알갱이는 작게, 밀도는 높게 — 그래야
+    //   눈송이가 흩날리는 게 아니라 먼지가 자욱하게 읽힌다.
+    const int   MaxParticles = 6000;
+    const float Rate         = 2100f;
     const float LifeTime     = 2.6f;
 
     [DidReloadScripts]
@@ -94,21 +99,26 @@ public static class SetupDustParticles
         main.loop = true;
         main.startLifetime = new ParticleSystem.MinMaxCurve(LifeTime * 0.6f, LifeTime);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.25f, 1.1f);
-        // 크기.
-        //   0.025~0.085m 로 잡았더니 눈에 안 보였다. 720p / FOV 60 기준으로
-        //   5m 거리에서 3~10px, 15m 에서는 1~3px 밖에 안 된다. 거기에 알파
-        //   0.16~0.30 이 곱해지고 텍스처 알파도 중심에서 제곱으로 떨어지니
-        //   실효 알파가 0.1 미만 — 사실상 투명한 점이었다.
-        //   0.09~0.26m 로 키운다. 5m 에서 11~32px 로 확실히 읽힌다.
-        main.startSize = new ParticleSystem.MinMaxCurve(0.09f, 0.26f);
+        // 크기 — 여기가 "먼지냐 눈이냐" 를 가른다.
+        //
+        //   0.025~0.085m 는 안 보였고(5m 에서 3~10px), 0.09~0.26m 로 키웠더니
+        //   눈송이가 됐다(5m 에서 11~32px). 720p/FOV60 기준으로
+        //     3~6px  = 알갱이로 읽힌다
+        //     10px+  = 눈송이로 보인다
+        //   0.03~0.075m 로 간다. 5m 에서 3.7~9.4px 라 알갱이 영역이다.
+        //
+        //   작아진 만큼 알파와 개수로 보상한다. 눈에 띄는 정도는
+        //   크기 x 알파 x 개수의 곱이라, 크기를 3분의 1로 줄여도 나머지를
+        //   올리면 존재감은 유지된다. 그러면서 개별 알갱이는 작게 남는다.
+        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.075f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
 
         // 색 — 누런 황사가 아니라 회색 먼지.
-        //   알파도 같이 올린다(0.16~0.30 -> 0.38~0.62). 크기만 키우고 알파를
-        //   두면 여전히 흐릿하다. 둘 다 곱해져서 보이는 것이라 함께 올려야 한다.
+        //   작은 입자는 픽셀 몇 개로 표현되므로 알파가 낮으면 배경에 묻힌다.
+        //   0.38~0.62 -> 0.55~0.85 로 올려 작아도 또렷하게 만든다.
         main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(0.72f, 0.72f, 0.73f, 0.62f),
-            new Color(0.58f, 0.58f, 0.60f, 0.38f));
+            new Color(0.74f, 0.74f, 0.75f, 0.85f),
+            new Color(0.56f, 0.56f, 0.59f, 0.55f));
         main.maxParticles = MaxParticles;
         main.gravityModifier = 0.008f;              // 거의 안 떨어진다. 공기에 떠 있는 것
         main.simulationSpace = ParticleSystemSimulationSpace.World;
@@ -181,11 +191,14 @@ public static class SetupDustParticles
         // 스트레치 빌보드 — 진행 방향으로 늘어난다.
         //   속도를 올려 놓고 동그란 점으로 두면 빨라진 게 눈에 안 들어온다.
         //   늘여야 "휭 지나갔다" 가 읽힌다.
-        //   velocityScale 이 속도에 비례한 늘임이라 강풍일수록 길어진다.
-        //   너무 키우면 빗줄기가 되므로 0.06 정도로 억제한다.
+        //
+        //   다만 늘임은 절대 길이(m)로 붙는데 입자 크기는 줄였다. 예전 값
+        //   0.06 x 19m/s = 1.14m 꼬리는 0.03m 알갱이의 38 배라 그냥 빗줄기다.
+        //   0.022 로 낮추면 0.42m — 알갱이 대비 6~14 배라 "날리는 결" 정도로
+        //   읽힌다. 크기를 줄일 때 여기를 같이 안 내리면 눈이 비로 바뀔 뿐이다.
         rend.renderMode = ParticleSystemRenderMode.Stretch;
-        rend.velocityScale = 0.06f;
-        rend.lengthScale = 1.6f;            // 기본 길이도 살짝
+        rend.velocityScale = 0.022f;
+        rend.lengthScale = 1.2f;            // 기본 길이는 거의 원형에 가깝게
         rend.cameraVelocityScale = 0f;      // 카메라 이동에는 반응하지 않게
 
         rend.sharedMaterial = mat;
@@ -291,3 +304,4 @@ public static class SetupDustParticles
         return m;
     }
 }
+

@@ -38,9 +38,13 @@ public static class SetupDustParticles
     // 카메라를 둘러싼 박스. 이 안에서만 먼지가 돈다.
     static readonly Vector3 BoxSize = new Vector3(34f, 18f, 34f);
 
-    const int   MaxParticles = 420;    // 이 정도면 화면이 비어 보이지 않는다
-    const float Rate         = 90f;    // 초당 방출
-    const float LifeTime     = 5.5f;
+    // "휭휭" 날아가는 강풍 황사.
+    //   빠르게 흐르면 한 알이 화면에 머무는 시간이 짧아진다. 그래서 수명을
+    //   줄이는 대신 방출량을 크게 올려야 화면 밀도가 유지된다.
+    //   수명 5.5 -> 2.6 초, 방출 90 -> 260/s, 상한 420 -> 700.
+    const int   MaxParticles = 700;
+    const float Rate         = 260f;
+    const float LifeTime     = 2.6f;
 
     [DidReloadScripts]
     static void OnReload()
@@ -98,27 +102,40 @@ public static class SetupDustParticles
         emission.rateOverTime = Rate;
 
         // 카메라를 감싸는 박스에서 방출한다.
+        //
+        //   박스를 바람이 불어오는 쪽(-X)으로 밀어 둔다. 정중앙에서 뿌리면
+        //   강풍이라 입자가 순식간에 +X 로 빠져나가 카메라 앞이 빈다.
+        //   상류에서 뿌려야 화면을 가로질러 지나간다.
+        //   박스는 월드 축 기준이 아니라 카메라 로컬이지만, 이 씬은 카메라가
+        //   거의 수평이라 문제되지 않는다.
         var shape = ps.shape;
         shape.enabled = true;
         shape.shapeType = ParticleSystemShapeType.Box;
         shape.scale = BoxSize;
-        shape.position = Vector3.zero;
+        shape.position = new Vector3(-BoxSize.x * 0.3f, 0f, 0f);
 
         // 바람 — 볼류메트릭 안개와 같은 방향(+X, 약간 +Z)으로 흘려야
         // 둘이 따로 노는 것처럼 보이지 않는다.
+        //
+        // 강풍이라 속도를 크게 올렸다(1.4~3.2 -> 9~19 m/s). 참고로 이 정도면
+        // 실제 풍속으로 초속 10~19m — 강풍주의보 수준이다.
+        // 개체마다 속도 편차를 크게 둬야 한 덩어리로 흐르지 않고 휘몰아친다.
         var vel = ps.velocityOverLifetime;
         vel.enabled = true;
         vel.space = ParticleSystemSimulationSpace.World;
-        vel.x = new ParticleSystem.MinMaxCurve(1.4f, 3.2f);
-        vel.y = new ParticleSystem.MinMaxCurve(-0.25f, 0.35f);
-        vel.z = new ParticleSystem.MinMaxCurve(0.4f, 1.3f);
+        vel.x = new ParticleSystem.MinMaxCurve(9f, 19f);
+        vel.y = new ParticleSystem.MinMaxCurve(-1.6f, 2.2f);
+        vel.z = new ParticleSystem.MinMaxCurve(2.5f, 7f);
 
-        // 흩날림 — 직선으로만 가면 비 오는 것처럼 보인다
+        // 흩날림 — 직선으로만 가면 비 오는 것처럼 보인다.
+        // 속도를 올린 만큼 난류도 같이 키워야 "휭휭" 휘몰아치는 느낌이 난다.
+        // 세기만 올리고 주파수를 그대로 두면 큰 덩어리가 통째로 흔들려
+        // 물결처럼 보이므로 주파수도 함께 올린다.
         var noise = ps.noise;
         noise.enabled = true;
-        noise.strength = new ParticleSystem.MinMaxCurve(0.35f);
-        noise.frequency = 0.28f;
-        noise.scrollSpeed = new ParticleSystem.MinMaxCurve(0.35f);
+        noise.strength = new ParticleSystem.MinMaxCurve(1.9f);
+        noise.frequency = 0.55f;
+        noise.scrollSpeed = new ParticleSystem.MinMaxCurve(1.4f);
         noise.quality = ParticleSystemNoiseQuality.Medium;
         noise.damping = true;
 
@@ -136,13 +153,24 @@ public static class SetupDustParticles
             });
         col.color = new ParticleSystem.MinMaxGradient(grad);
 
-        // 천천히 도는 것만으로도 살아 있는 느낌이 난다
+        // 회전은 끈다. 아래에서 Stretch 렌더 모드를 쓰는데, 그 모드는 입자를
+        // 속도 방향으로 정렬하므로 회전값이 무시된다. 켜 두면 인스펙터에서
+        // 동작하는 것처럼 보여 헷갈린다.
         var rot = ps.rotationOverLifetime;
-        rot.enabled = true;
-        rot.z = new ParticleSystem.MinMaxCurve(-0.6f, 0.6f);
+        rot.enabled = false;
 
         var rend = go.GetComponent<ParticleSystemRenderer>();
-        rend.renderMode = ParticleSystemRenderMode.Billboard;
+
+        // 스트레치 빌보드 — 진행 방향으로 늘어난다.
+        //   속도를 올려 놓고 동그란 점으로 두면 빨라진 게 눈에 안 들어온다.
+        //   늘여야 "휭 지나갔다" 가 읽힌다.
+        //   velocityScale 이 속도에 비례한 늘임이라 강풍일수록 길어진다.
+        //   너무 키우면 빗줄기가 되므로 0.06 정도로 억제한다.
+        rend.renderMode = ParticleSystemRenderMode.Stretch;
+        rend.velocityScale = 0.06f;
+        rend.lengthScale = 1.6f;            // 기본 길이도 살짝
+        rend.cameraVelocityScale = 0f;      // 카메라 이동에는 반응하지 않게
+
         rend.sharedMaterial = mat;
         rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         rend.receiveShadows = false;

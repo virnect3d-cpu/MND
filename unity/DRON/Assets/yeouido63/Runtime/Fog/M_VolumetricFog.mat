@@ -29,15 +29,19 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _DensityMultiplier: 0.6
-    - _DensityThreshold: 0.35
-    - _LightScattering: 0.35
-    - _MaxDistance: 2500
+    - _DensityMultiplier: 0.81
+    - _DensityThreshold: 0.46
+    - _HeightBase: 0
+    - _HeightFalloff: 0.0062
+    - _LightScattering: 0.55
+    - _MaxDistance: 2600
     - _NoiseOffset: 1
-    - _NoiseTiling: 0.35
-    - _StepSize: 12
+    - _NoiseTiling: 0.55
+    - _StepSize: 18
+    - _WindSpeed: 7
     m_Colors:
-    - _Color: {r: 0.62, g: 0.68, b: 0.76, a: 1}
-    - _LightContribution: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 0.76, g: 0.66, b: 0.47, a: 1}
+    - _LightContribution: {r: 1.15, g: 1, b: 0.72, a: 1}
+    - _WindDir: {r: 1, g: 0, b: 0.35, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

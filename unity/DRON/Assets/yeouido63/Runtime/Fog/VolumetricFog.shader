@@ -35,6 +35,12 @@ Shader "Yeouido63/VolumetricFog"
         _DensityThreshold   ("Density threshold", Range(0, 1)) = 0.1
         [HDR]_LightContribution ("Light contribution", Color) = (1, 1, 1, 1)
         _LightScattering    ("Light scattering", Range(0, 1)) = 0.2
+
+        // 황사용 — 안개를 바람에 흘리고 고도에 따라 옅게 만든다
+        _WindDir            ("Wind direction (XZ)", Vector) = (1, 0, 0.35, 0)
+        _WindSpeed          ("Wind speed (m/s)", Range(0, 30)) = 6
+        _HeightFalloff      ("Height falloff (1/m)", Range(0, 0.02)) = 0.0025
+        _HeightBase         ("Height base (world Y)", float) = 0
     }
 
     SubShader
@@ -69,6 +75,10 @@ Shader "Yeouido63/VolumetricFog"
             float  _NoiseTiling;
             float4 _LightContribution;
             float  _LightScattering;
+            float4 _WindDir;
+            float  _WindSpeed;
+            float  _HeightFalloff;
+            float  _HeightBase;
 
             // 전방 산란이 강한 안개일수록 빛 쪽이 밝게 빛난다
             float henyey_greenstein(float angle, float scattering)
@@ -79,9 +89,24 @@ Shader "Yeouido63/VolumetricFog"
 
             float get_density(float3 worldPos)
             {
-                float3 uvw = worldPos * 0.01 * _NoiseTiling;
+                // 바람에 실려 흐르게 한다. 노이즈를 월드에 고정해 두면 카메라가
+                // 멈췄을 때 완전히 정지한 판때기로 보인다 — 황사는 흘러야 한다.
+                float3 wind = float3(_WindDir.x, 0, _WindDir.z) * (_WindSpeed * _Time.y);
+                float3 uvw = (worldPos - wind) * 0.01 * _NoiseTiling;
+
                 float4 noise = SAMPLE_TEXTURE3D_LOD(_FogNoise, sampler_TrilinearRepeat, uvw, 0);
                 float density = dot(noise, noise);
+
+                // 두 번째 옥타브를 반대로 흘려 결이 뭉개지지 않게 한다.
+                // 단일 옥타브만 쓰면 같은 무늬가 평행이동만 해서 눈에 띈다.
+                float3 uvw2 = (worldPos + wind * 0.45) * 0.031 * _NoiseTiling;
+                float4 n2 = SAMPLE_TEXTURE3D_LOD(_FogNoise, sampler_TrilinearRepeat, uvw2, 0);
+                density = density * 0.72 + dot(n2, n2) * 0.28;
+
+                // 고도 감쇠 — 황사는 지표에 깔리고 위로 갈수록 옅다.
+                // 이게 없으면 하늘까지 균일하게 누레져서 색필터처럼 보인다.
+                density *= exp(-max(0.0, worldPos.y - _HeightBase) * _HeightFalloff);
+
                 density = saturate(density - _DensityThreshold) * _DensityMultiplier;
                 return density;
             }

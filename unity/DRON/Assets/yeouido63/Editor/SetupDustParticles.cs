@@ -57,13 +57,16 @@ public static class SetupDustParticles
     // 속력 범위는 여기서 정하고, 방향은 SyncWind.Angle 하나로
     // 결정한다. 예전엔 여기에 45 도 성분을 숫자로 박아 뒀는데, 그러면
     // SyncWind 에서 각도를 바꿔도 먼지만 옛 방향에 남는다.
-    //   9.3~20.2 (평균 14.75) -> 7.9~17.2 (15% 감소) -> 5.6~12.2 로
-    //   한 번 더 내렸다. 평균 8.9 m/s 면 처음의 60% 다.
+    //   9.3~20.2 (평균 14.75) -> 7.9~17.2 -> 5.6~12.2 -> 2.5~5.5 로
+    //   내려왔다. 평균 4.0 m/s 면 처음의 27% 다.
     //   잔디는 이 값에서 역산되므로 여기만 고치면 같이 느려진다.
-    //   실제 풍속으로 치면 "바람이 세게 분다" 수준이라 먼지가 날리는
-    //   건 보이되 휘몰아치지는 않는다.
-    public const float SpeedMin = 5.6f;
-    public const float SpeedMax = 12.2f;
+    //   실제 풍속으로 치면 "산들바람" 수준이라 먼지가 흩날리기보다
+    //   천천히 떠다니는 그림이 된다.
+    //
+    //   여길 고치면 난류 강도도 같이 내려야 한다. 체감 편향각이
+    //   atan(강도/풍속) 이라 풍속만 줄이면 먼지가 옆으로 더 휜다.
+    public const float SpeedMin = 2.5f;
+    public const float SpeedMax = 5.5f;
 
     // 대표 풍속 (중간값, m/s). 잔디/안개/구름이 여기 맞춘다.
     public static float WindSpeed => (SpeedMin + SpeedMax) * 0.5f;
@@ -246,9 +249,11 @@ public static class SetupDustParticles
         //   바람과의 비로 각도가 정해지기 때문이다. 3.2~5.6 을 그대로 두고
         //   풍속만 14.75 -> 8.9 로 내리면 ±20~32도까지 휘어 궤적이 산만해진다.
         //   2.05~3.42 면 ±13~21도로 예전 느낌이 유지된다.
+        //   풍속을 8.9 -> 4.0 으로 또 내렸으니 같은 비(0.449)로 줄인다.
+        //   0.92~1.54 -> 여전히 ±13~21도다.
         var noise = ps.noise;
         noise.enabled = true;
-        noise.strength = new ParticleSystem.MinMaxCurve(2.05f, 3.42f);
+        noise.strength = new ParticleSystem.MinMaxCurve(0.92f, 1.54f);
         noise.frequency = 0.42f;
         noise.scrollSpeed = new ParticleSystem.MinMaxCurve(1.4f);
         noise.quality = ParticleSystemNoiseQuality.Medium;
@@ -331,9 +336,11 @@ public static class SetupDustParticles
         // 더 빠르게. 가까운 것이 빨리 지나가야 시차로 깊이가 읽힌다.
         WindVelocity(ps, 1.1f, 1.6f, -2f, 2.5f);
 
+        // MID 와 같은 비(0.449)로 줄인다. 풍속만 내리고 난류를 두면
+        // 가까운 알갱이만 유독 산만하게 튄다. (4~7 -> 1.8~3.14)
         var noise = ps.noise;
         noise.enabled = true;
-        noise.strength = new ParticleSystem.MinMaxCurve(4f, 7f);
+        noise.strength = new ParticleSystem.MinMaxCurve(1.8f, 3.14f);
         noise.frequency = 0.7f;
         noise.scrollSpeed = new ParticleSystem.MinMaxCurve(2f);
         noise.quality = ParticleSystemNoiseQuality.Medium;

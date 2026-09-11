@@ -38,7 +38,7 @@ Material:
     - _NoiseOffset: 1
     - _NoiseTiling: 0.55
     - _StepSize: 22
-    - _WindSpeed: 4.45
+    - _WindSpeed: 2
     m_Colors:
     - _Color: {r: 0.63, g: 0.64, b: 0.66, a: 1}
     - _LightContribution: {r: 0.32, g: 0.32, b: 0.33, a: 1}

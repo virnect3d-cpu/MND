@@ -71,7 +71,7 @@ public class CloudLayerHandle : MonoBehaviour
     [Tooltip("구름 덩어리가 흘러가는 속도(m/s). 0 이면 제자리에서 뭉개지기만 한다. " +
              "shapeOffset 은 원근 감쇠가 없어서 지상 바람만큼 주면 너무 빠르다.")]
     [Min(0f)]
-    public float driftSpeed = 0.4f;
+    public float driftSpeed = 0.15f;
 
     [Tooltip("흐르는 방향(XZ). 정규화해서 쓴다. (1,0)=+X, (0,-1)=-Z")]
     public Vector2 driftDirection = new Vector2(1f, 0f);
@@ -83,7 +83,7 @@ public class CloudLayerHandle : MonoBehaviour
     [Tooltip("전체 속도 배율. 상한이 없다. 이동과는 무관하고 모양이 변하는 속도다. " +
              "아래 두 값을 곱하므로 셋 중 하나만 낮추면 체감이 잘 안 바뀐다.")]
     [Min(0f)]
-    public float speed = 0.3f;
+    public float speed = 0.12f;
 
     [Tooltip("형상이 굴러가는 속도. 상한 1 이다.")]
     [Range(0f, 1f)]

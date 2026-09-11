@@ -187,38 +187,19 @@ public static class SyncWind
             float compass = Mathf.Repeat(90f - Angle, 360f);
             SetParam(so, "globalOrientation", compass);
 
-            // 속도. 배율이라 m/s 로 환산할 근거가 없다.
+            // 속도와 고도는 여기서 안 쓴다 — CloudLayerHandle 소유다.
             //
-            //   1.2 는 너무 느렸다. 구름은 멀리 있어서 같은 속도라도
-            //   화면에서 움직이는 각도가 훨씬 작다 — 고도 250 m 에 떠 있고
-            //   수 km 밖까지 뻗어 있으니, 지면의 잔디와 같은 배율로 두면
-            //   거의 멈춘 것처럼 보인다. 거리 보정 삼아 4 배로 올린다.
-            //   (1.2 -> 4.8)
+            //   예전엔 여기서 globalSpeed / shape / erosion / 고도까지 전부
+            //   썼다. 핸들이 생긴 뒤로 같은 파라미터를 두 곳에서 쓰게 됐고,
+            //   실제로 핸들에서 0.12 로 내린 globalSpeed 를 바람 동기화가
+            //   7.5 로 되돌려 버렸다. 값은 적히는데 왜 안 느려지는지
+            //   찾기 어려운 종류의 버그다.
             //
-            //   속도를 올릴 수 있는 건 사실상 이것뿐이다. 아래 두 배율은
-            //   상한이 1.0 이라(VolumetricCloudsVolume.cs 참고) 거기서
-            //   더 빠르게 만들 수 없다. globalSpeed 가 전체를 곱한다.
-            //   FloatParameter 라 상한이 없어서 여기는 얼마든 올릴 수 있다.
-            //   (1.2 -> 4.8 -> 7.5)
-            const float GlobalSpeed = 7.5f;
-            SetParam(so, "globalSpeed", GlobalSpeed);
-
-            // 자전 — 구름이 흐르기만 하고 모양이 그대로면 판때기가
-            // 미끄러지는 것처럼 보인다. 형상 노이즈를 같이 굴려야
-            // 뭉쳤다 풀어지며 떠간다.
-            //
-            //   둘 다 ClampedFloatParameter(0, 1) 이라 최대가 1.0 이다.
-            //   2.4 / 3.0 을 넣으면 조용히 1.0 으로 잘린다 — 값은 적히는데
-            //   화면은 안 바뀌어서 적용된 줄 알기 쉽다. 상한으로 둔다.
-            const float ShapeSpeed = 1.0f, ErosionSpeed = 1.0f;
-            SetParam(so, "shapeSpeedMultiplier", ShapeSpeed);
-            SetParam(so, "erosionSpeedMultiplier", ErosionSpeed);
-
-            // 고도 — 값은 250/120 으로 적혀 있는데 override 가 꺼져 있어서
-            // 적용이 안 되고 기본값으로 돌고 있었다. 프로파일에 숫자가
-            // 보인다고 쓰이는 게 아니다.
-            SetParam(so, "bottomAltitude", 250f);
-            SetParam(so, "altitudeRange", 120f);
+            //   소유권을 갈랐다.
+            //     SyncWind          -> 방위(globalOrientation) 만
+            //     CloudLayerHandle  -> 속도 / 고도 / 짙기 / 드리프트
+            //   바람 방향은 먼지·잔디·안개와 한 값에서 나와야 하므로
+            //   방위만 여기 남는다.
 
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
@@ -226,8 +207,7 @@ public static class SyncWind
             // 값을 문자열에 박아 두지 않는다. 예전엔 globalSpeed 를 4.8 로
             // 바꾸고도 로그에는 "1.2" 가 찍혀서, 적용이 안 된 줄 알고
             // 리컴파일을 세 번이나 다시 돌렸다.
-            Debug.Log($"[바람] 구름: orientation={compass}도, globalSpeed={GlobalSpeed}, " +
-                      $"shapeSpeed={ShapeSpeed}, erosionSpeed={ErosionSpeed}");
+            Debug.Log($"[바람] 구름: orientation={compass}도 (속도/고도는 CLOUD_Layer 담당)");
             return;
         }
         Debug.LogWarning("[바람] 프로파일에 VolumetricClouds 가 없다.");

@@ -1,14 +1,11 @@
 {
-    "name": "Virnect.Yeouido63.Editor",
+    "name": "Virnect.Yeouido63.Runtime",
     "rootNamespace": "",
     "references": [
         "Unity.RenderPipelines.Core.Runtime",
-        "Unity.RenderPipelines.Universal.Runtime",
-        "Virnect.Yeouido63.Runtime"
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

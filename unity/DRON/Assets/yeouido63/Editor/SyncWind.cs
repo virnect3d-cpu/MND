@@ -132,8 +132,25 @@ public static class SyncWind
             // 다만 덩어리째 흐르면 눈에 띄므로 먼지보다 느리게 둔다 —
             // 실제로도 큰 기단은 알갱이보다 천천히 움직이는 것처럼 보인다.
             fog.SetFloat("_WindSpeed", speed * 0.5f);
+
+            // 고도 감쇠 — 하늘의 "아지랑이" 를 잡는다.
+            //
+            //   0.0062 로 두면 구름 고도(250~370m)에서도 밀도배율이
+            //   0.21~0.10 이라 완전히 0 이 아니다. _MaxDistance 가 1200m 라
+            //   레이가 거기까지 닿고, 노이즈가 바람에 흐르니 하늘이 계속
+            //   일렁인다 — 그게 구름 근처에서 보이던 아지랑이다.
+            //
+            //   0.020 이면 20m 에서 0.70 을 유지해 옥상 주변 공기는 그대로
+            //   두면서, 250m 에서 0.007 로 떨어져 하늘이 잠잠해진다.
+            //   HeightBase 도 카메라 높이에 맞춰 2 로 올린다. 0 이면 감쇠가
+            //   지면부터 시작해 눈높이 안개가 필요 이상으로 옅어진다.
+            const float HeightFalloff = 0.020f, HeightBase = 2f;
+            fog.SetFloat("_HeightFalloff", HeightFalloff);
+            fog.SetFloat("_HeightBase", HeightBase);
+
             EditorUtility.SetDirty(fog);
-            Debug.Log($"[바람] 안개: dir {Angle}도, _WindSpeed={speed * 0.5f:F2}");
+            Debug.Log($"[바람] 안개: dir {Angle}도, _WindSpeed={speed * 0.5f:F2}, " +
+                      $"HeightFalloff={HeightFalloff} (구름 고도 아지랑이 억제)");
         }
 
         // --- 구름 ---
@@ -192,6 +209,12 @@ public static class SyncWind
             SetParam(so, "shapeSpeedMultiplier", ShapeSpeed);
             SetParam(so, "erosionSpeedMultiplier", ErosionSpeed);
 
+            // 고도 — 값은 250/120 으로 적혀 있는데 override 가 꺼져 있어서
+            // 적용이 안 되고 기본값으로 돌고 있었다. 프로파일에 숫자가
+            // 보인다고 쓰이는 게 아니다.
+            SetParam(so, "bottomAltitude", 250f);
+            SetParam(so, "altitudeRange", 120f);
+
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(comp);
             EditorUtility.SetDirty(post);
@@ -223,4 +246,5 @@ public static class SyncWind
         else { Debug.LogWarning($"[바람] 타입이 숫자가 아님: {name}"); return; }
     }
 }
+
 

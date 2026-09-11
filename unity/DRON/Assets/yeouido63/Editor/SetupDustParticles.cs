@@ -57,8 +57,12 @@ public static class SetupDustParticles
     // 속력 범위는 여기서 정하고, 방향은 SyncWind.Angle 하나로
     // 결정한다. 예전엔 여기에 45 도 성분을 숫자로 박아 뒀는데, 그러면
     // SyncWind 에서 각도를 바꿔도 먼지만 옛 방향에 남는다.
-    public const float SpeedMin = 9.3f;
-    public const float SpeedMax = 20.2f;
+    //   "아주 조금만" 줄인다 — 9.3~20.2 (평균 14.75) 에서 15% 내려
+    //   7.9~17.2 (평균 12.55) 로. 잔디는 이 값에서 역산되므로 여기만
+    //   고치면 같이 느려진다. 강풍주의보(14m/s) 바로 아래라 여전히
+    //   "휭휭" 은 유지된다.
+    public const float SpeedMin = 7.9f;
+    public const float SpeedMax = 17.2f;
 
     // 대표 풍속 (중간값, m/s). 잔디/안개/구름이 여기 맞춘다.
     public static float WindSpeed => (SpeedMin + SpeedMax) * 0.5f;

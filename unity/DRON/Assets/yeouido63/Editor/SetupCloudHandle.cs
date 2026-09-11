@@ -26,12 +26,21 @@ public static class SetupCloudHandle
     //   반대였다 — shapeOffset 은 카메라 거리와 무관하게 무늬를 미는 값이라
     //   원근 감쇠가 없다. 12 면 하늘 전체가 눈에 띄게 쓸려 간다.
     //
-    //   2.5 로 내린다. 5 분에 750 m 라 보고 있으면 느리게 흐르는 게
-    //   느껴지되 시선을 끌지는 않는다.
-    const float DriftSpeed  = 2.5f;
+    //   2.5 로 내렸는데도 빨랐다. 0.8 로 한 번 더 내린다.
+    //   10 분에 480 m — 한참 보고 있어야 움직인 게 보이는 정도다.
+    const float DriftSpeed  = 0.8f;
 
-    // 제자리에서 굴러가는 속도. 7.5 -> 2.5.
-    const float GlobalSpeed = 2.5f;
+    // 제자리에서 굴러가는 속도(배율).
+    //
+    //   여기가 진짜 범인이었다. 드리프트만 낮추고 이걸 그대로 뒀더니
+    //   구름이 여전히 빨라 보였다. globalSpeed 는 아래 두 배율을 곱하는데
+    //   둘 다 1.0(상한)으로 올려 둔 상태라 실효 속도가 그대로였다.
+    //
+    //   globalSpeed 7.5 -> 2.5 -> 0.6 으로 내리고, 배율도 같이 낮춘다.
+    //   셋이 곱해지므로 하나만 만지면 체감이 잘 안 바뀐다.
+    const float GlobalSpeed   = 0.6f;
+    const float ShapeSpeed    = 0.35f;   // 형상이 뭉개지는 속도
+    const float ErosionSpeed  = 0.25f;   // 가장자리가 헐리는 속도
 
     [DidReloadScripts]
     static void OnReload()
@@ -71,6 +80,19 @@ public static class SetupCloudHandle
         // 프로파일을 덮어써서 하늘이 통째로 바뀐다.
         h.Pull();
 
+        // 수평 기준점은 0 으로 되돌린다.
+        //
+        //   Pull 은 프로파일 오프셋에서 드리프트를 빼 기준점을 구하는데,
+        //   스크립트 리로드로 _drift 가 0 이 된 직후에는 뺄 값이 없다.
+        //   그러면 누적된 이동량이 통째로 기준점으로 굳어서, 셋업을
+        //   돌릴 때마다 구름이 수천 m 씩 밀려난다 (실제로 -2543 이 나왔다).
+        //
+        //   수평 기준점은 어차피 의미 있는 값이 아니다. 같은 노이즈를
+        //   어디서 잘라 보느냐일 뿐이라 0 이 기준으로 적당하다.
+        //   고도(y)는 진짜 의미가 있으니 Pull 이 읽은 값을 그대로 둔다.
+        var pos = h.transform.position;
+        h.transform.position = new Vector3(0f, pos.y, 0f);
+
         // 회전 연동은 꺼 둔다. 방위는 SyncWind 가 바람 각도에서 계산해
         // 쓰고 있어서, 둘 다 켜면 마지막에 쓴 쪽이 이긴다.
         h.driveOrientation = false;
@@ -83,10 +105,10 @@ public static class SetupCloudHandle
         h.driftDirection = new Vector2(1f, 0f);   // +X
         h.driftInEditMode = true;
 
-        // 굴러가는 속도는 낮춘다. 7.5 로 두면 모양이 워낙 빨리 변해서
-        // 어느 쪽으로 흐르는지가 묻힌다. 2.5 면 모양은 거의 유지되고
-        // 이동 방향이 또렷하게 읽힌다.
-        h.speed = GlobalSpeed;
+        // 굴러가는 속도. 세 값이 곱해지므로 같이 낮춰야 체감이 바뀐다.
+        h.speed        = GlobalSpeed;
+        h.shapeSpeed   = ShapeSpeed;
+        h.erosionSpeed = ErosionSpeed;
 
         h.Apply();
 
@@ -103,7 +125,8 @@ public static class SetupCloudHandle
                   $"고도 {p.y:F0}~{p.y + h.thickness:F0} m, " +
                   $"기준 오프셋 ({p.x:F0},{p.z:F0}), 짙기 {h.density:F2}. " +
                   $"드리프트 {h.driftSpeed:F1} m/s -> " +
-                  $"({h.driftDirection.x:F0},{h.driftDirection.y:F0}), " +
-                  $"굴러가는 속도 {h.speed:F1}.");
+                  $"({h.driftDirection.x:F0},{h.driftDirection.y:F0}). " +
+                  $"굴러가기 {h.speed:F2} x 형상 {h.shapeSpeed:F2}/침식 {h.erosionSpeed:F2} " +
+                  $"= 실효 {h.speed * h.shapeSpeed:F2}/{h.speed * h.erosionSpeed:F2}.");
     }
 }

@@ -16955,12 +16955,12 @@ MonoBehaviour:
   driveOrientation: 0
   thickness: 120
   density: 0.14
-  driftSpeed: 2.5
+  driftSpeed: 0.8
   driftDirection: {x: 1, y: 0}
   driftInEditMode: 1
-  speed: 2.5
-  shapeSpeed: 1
-  erosionSpeed: 1
+  speed: 0.6
+  shapeSpeed: 0.35
+  erosionSpeed: 0.25
   drawGizmo: 1
   gizmoExtent: 400
 --- !u!4 &1154187050

@@ -71,7 +71,7 @@ public class CloudLayerHandle : MonoBehaviour
     [Tooltip("구름 덩어리가 흘러가는 속도(m/s). 0 이면 제자리에서 뭉개지기만 한다. " +
              "shapeOffset 은 원근 감쇠가 없어서 지상 바람만큼 주면 너무 빠르다.")]
     [Min(0f)]
-    public float driftSpeed = 2.5f;
+    public float driftSpeed = 0.8f;
 
     [Tooltip("흐르는 방향(XZ). 정규화해서 쓴다. (1,0)=+X, (0,-1)=-Z")]
     public Vector2 driftDirection = new Vector2(1f, 0f);
@@ -79,18 +79,19 @@ public class CloudLayerHandle : MonoBehaviour
     [Tooltip("에디터에서 플레이 중이 아닐 때도 흐른다")]
     public bool driftInEditMode = true;
 
-    [Header("흐름")]
-    [Tooltip("전체 속도 배율. 상한이 없다. 이건 '제자리에서 굴러가는' 속도라 이동과 무관하다.")]
+    [Header("흐름 — 제자리에서 굴러가기")]
+    [Tooltip("전체 속도 배율. 상한이 없다. 이동과는 무관하고 모양이 변하는 속도다. " +
+             "아래 두 값을 곱하므로 셋 중 하나만 낮추면 체감이 잘 안 바뀐다.")]
     [Min(0f)]
-    public float speed = 2.5f;
+    public float speed = 0.6f;
 
     [Tooltip("형상이 굴러가는 속도. 상한 1 이다.")]
     [Range(0f, 1f)]
-    public float shapeSpeed = 1f;
+    public float shapeSpeed = 0.35f;
 
-    [Tooltip("가장자리가 뭉개지는 속도. 상한 1 이다.")]
+    [Tooltip("가장자리가 헐리는 속도. 상한 1 이다.")]
     [Range(0f, 1f)]
-    public float erosionSpeed = 1f;
+    public float erosionSpeed = 0.25f;
 
     [Header("씬 뷰")]
     [Tooltip("구름층을 상자로 그린다")]
@@ -256,7 +257,13 @@ public class CloudLayerHandle : MonoBehaviour
         // 프로파일에 든 오프셋은 기준점 + 드리프트다. 그대로 위치에 넣으면
         // 흘러간 만큼이 기준점으로 굳어서, 되읽기를 누를 때마다 구름이
         // 점점 멀어진다. 드리프트를 빼고 기준점만 되돌린다.
-        if (TryGetVec3("shapeOffset", out var off))
+        //
+        // 단 스크립트 리로드 직후에는 _drift 가 0 이라 뺄 값이 없다.
+        // 그때 누적분을 그대로 받으면 기준점이 수천 m 로 튄다.
+        // 드리프트를 쓰는 중이면 되읽기 자체를 건너뛴다 — 수평 기준점은
+        // 어차피 노이즈를 어디서 자르느냐일 뿐이라 잃을 정보가 없다.
+        bool drifting = driftSpeed > 0f;
+        if (!drifting && TryGetVec3("shapeOffset", out var off))
         {
             p.x = off.x - _drift.x;
             p.z = off.z - _drift.y;

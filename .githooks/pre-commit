@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# 볼류메트릭 구름의 런타임 드리프트를 커밋에서 걷어낸다
+#
+# 왜 필요한가
+#   구름 셰이더와 CloudLayerHandle 이 실행되는 동안 노이즈 오프셋과 바람
+#   벡터가 계속 누적된다. 이 값들은 머티리얼/프로파일 에셋에 그대로
+#   기록되므로, 에디터를 켜 두기만 해도 커밋할 때마다 diff 가 생긴다.
+#   내용은 매번 다르고 의미는 없어서 실제 변경을 덮어 버린다.
+#
+#   지금까지 커밋 직전에 손으로 되돌려 왔는데 몇 번 빠뜨렸다.
+#   스테이지된 내용에서 자동으로 기준값으로 되돌린다.
+#
+# 되돌리는 것과 안 건드리는 것
+#   되돌림: 시간에 따라 누적되는 런타임 상태
+#   유지  : _WindDirection, _SmallWindSpeed 같은 의도한 설정값
+#
+# 끄려면: git commit --no-verify
+
+set -e
+
+MAT="unity/DRON/Assets/VolumetricClouds/VolumetricClouds.mat"
+PROFILE="unity/DRON/Assets/yeouido63/Scenes/Yeouido63_Post.asset"
+
+changed=""
+
+# --- 구름 머티리얼 -----------------------------------------------------
+if git diff --cached --name-only | grep -qx "$MAT"; then
+  if [ -f "$MAT" ]; then
+    sed -i \
+      -e 's/\(_CloudNearPlane: \).*/\11198.2786/' \
+      -e 's/\(_VerticalErosionWindDisplacement: \).*/\10/' \
+      -e 's/\(- _ShapeNoiseOffset: {\)r: [^,]*, g: [^,]*, b: [^,]*, a: [^}]*}/\1r: 0, g: 0, b: 0, a: 0}/' \
+      -e 's/\(- _WindVector: {\)r: [^,]*, g: [^,]*, b: [^,]*, a: [^}]*}/\1r: 0, g: 0, b: 0, a: 0}/' \
+      "$MAT"
+    git add "$MAT"
+    changed="$changed
+  VolumetricClouds.mat  (노이즈 오프셋/바람 벡터)"
+  fi
+fi
+
+# --- 포스트 프로파일 ---------------------------------------------------
+#
+# shapeOffset 은 CloudLayerHandle 의 드리프트가 누적된 값이다.
+# 기준점은 Transform 이 들고 있으니 에셋에는 0 으로 남겨도 된다.
+if git diff --cached --name-only | grep -qx "$PROFILE"; then
+  if [ -f "$PROFILE" ]; then
+    perl -0pi -e 's/(  shapeOffset:\n    m_OverrideState: \d\n    m_Value: )\{[^}]*\}/${1}{x: 0, y: 0, z: 0}/' "$PROFILE"
+    git add "$PROFILE"
+    changed="$changed
+  Yeouido63_Post.asset  (shapeOffset 드리프트)"
+  fi
+fi
+
+if [ -n "$changed" ]; then
+  echo "[pre-commit] 런타임 드리프트를 기준값으로 되돌렸다:$changed"
+fi
+
+exit 0

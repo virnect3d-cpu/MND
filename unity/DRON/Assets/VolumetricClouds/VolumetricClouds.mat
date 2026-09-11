@@ -146,7 +146,7 @@ Material:
     - _LowestCloudAltitude: 6379300
     - _MaxStep: 24
     - _MaxStepSize: 250
-    - _MediumWindSpeed: 1
+    - _MediumWindSpeed: 0.35
     - _Metallic: 0
     - _MicroErosionFactor: 0.5
     - _MicroErosionScale: 200
@@ -162,7 +162,7 @@ Material:
     - _Seed: 0
     - _ShapeFactor: 0.9
     - _ShapeScale: 5
-    - _SmallWindSpeed: 1
+    - _SmallWindSpeed: 0.25
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1

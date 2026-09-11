@@ -45,18 +45,25 @@ public class CloudLayerHandleEditor : Editor
             drift = $"드리프트 {h.driftSpeed:F1} m/s → {axis} ({d.x:F2}, {d.y:F2})";
         }
 
+        // 굴러가는 속도는 세 값이 곱해진다. 하나만 보고 판단하면
+        // "낮췄는데 왜 그대로지" 가 된다. 곱을 같이 보여 준다.
+        float shapeEff   = h.speed * h.shapeSpeed;
+        float erosionEff = h.speed * h.erosionSpeed;
+
         EditorGUILayout.HelpBox(
             $"구름층 {p.y:F0} ~ {p.y + h.thickness:F0} m\n" +
             $"기준 오프셋 ({p.x:F0}, {p.z:F0}) m\n" +
             $"{drift}\n" +
-            $"짙기 {h.density:F2} · 굴러가는 속도 {h.speed:F1}",
+            $"짙기 {h.density:F2}\n" +
+            $"굴러가기 실효 — 형상 {shapeEff:F2} · 침식 {erosionEff:F2}  " +
+            $"({h.speed:F2} × {h.shapeSpeed:F2}/{h.erosionSpeed:F2})",
             MessageType.Info);
 
-        if (h.driftSpeed > 0f && h.speed > 4f)
+        if (h.driftSpeed > 0f && shapeEff > 2f)
         {
             EditorGUILayout.HelpBox(
-                "드리프트를 켠 상태에서 '굴러가는 속도'가 높으면 흐르는 방향이 " +
-                "모양 변화에 묻힌다. 2~3 정도가 방향이 또렷하다.",
+                $"형상 실효 속도가 {shapeEff:F1} 이라 흐르는 방향이 모양 변화에 묻힌다. " +
+                "세 값이 곱해지니 하나만 낮추지 말고 같이 낮춰라.",
                 MessageType.Warning);
         }
 

@@ -227,7 +227,7 @@ MonoBehaviour:
     m_OverrideState: 0
     m_Value: 1
   densityMultiplier:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 0.14
   densityCurve:
     m_OverrideState: 0
@@ -362,7 +362,7 @@ MonoBehaviour:
     m_OverrideState: 1
     m_Value: 120
   shapeOffset:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: {x: 0, y: 0, z: 0}
   earthCurvature:
     m_OverrideState: 0

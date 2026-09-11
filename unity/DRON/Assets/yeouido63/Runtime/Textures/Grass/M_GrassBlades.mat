@@ -32,7 +32,7 @@ Material:
     - _Cutoff: 0.35
     - _Smoothness: 0.18
     - _WindFreq: 0.62
-    - _WindSpeed: 7.781
+    - _WindSpeed: 5.5179996
     - _WindStrength: 0.12
     m_Colors:
     - _BaseColor: {r: 0.96, g: 1, b: 0.88, a: 1}

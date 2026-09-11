@@ -140,11 +140,16 @@ public static class SyncWind
             //   레이가 거기까지 닿고, 노이즈가 바람에 흐르니 하늘이 계속
             //   일렁인다 — 그게 구름 근처에서 보이던 아지랑이다.
             //
-            //   0.020 이면 20m 에서 0.70 을 유지해 옥상 주변 공기는 그대로
-            //   두면서, 250m 에서 0.007 로 떨어져 하늘이 잠잠해진다.
-            //   HeightBase 도 카메라 높이에 맞춰 2 로 올린다. 0 이면 감쇠가
+            //   0.020 으로 올려 많이 줄었지만 250m 에서 아직 0.007 이 남아
+            //   하늘 일렁임이 완전히 죽지는 않았다. 0.035 로 한 번 더 올린다.
+            //     20m  0.53   (옥상 주변 공기 유지)
+            //     60m  0.13   (원경 안개는 남음)
+            //    150m  0.005  (사실상 0)
+            //    250m  0.0002 (완전히 0)
+            //
+            //   HeightBase 는 카메라 높이에 맞춰 2 로 둔다. 0 이면 감쇠가
             //   지면부터 시작해 눈높이 안개가 필요 이상으로 옅어진다.
-            const float HeightFalloff = 0.020f, HeightBase = 2f;
+            const float HeightFalloff = 0.035f, HeightBase = 2f;
             fog.SetFloat("_HeightFalloff", HeightFalloff);
             fog.SetFloat("_HeightBase", HeightBase);
 
@@ -246,5 +251,6 @@ public static class SyncWind
         else { Debug.LogWarning($"[바람] 타입이 숫자가 아님: {name}"); return; }
     }
 }
+
 
 

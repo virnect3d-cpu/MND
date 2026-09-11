@@ -57,12 +57,13 @@ public static class SetupDustParticles
     // 속력 범위는 여기서 정하고, 방향은 SyncWind.Angle 하나로
     // 결정한다. 예전엔 여기에 45 도 성분을 숫자로 박아 뒀는데, 그러면
     // SyncWind 에서 각도를 바꿔도 먼지만 옛 방향에 남는다.
-    //   "아주 조금만" 줄인다 — 9.3~20.2 (평균 14.75) 에서 15% 내려
-    //   7.9~17.2 (평균 12.55) 로. 잔디는 이 값에서 역산되므로 여기만
-    //   고치면 같이 느려진다. 강풍주의보(14m/s) 바로 아래라 여전히
-    //   "휭휭" 은 유지된다.
-    public const float SpeedMin = 7.9f;
-    public const float SpeedMax = 17.2f;
+    //   9.3~20.2 (평균 14.75) -> 7.9~17.2 (15% 감소) -> 5.6~12.2 로
+    //   한 번 더 내렸다. 평균 8.9 m/s 면 처음의 60% 다.
+    //   잔디는 이 값에서 역산되므로 여기만 고치면 같이 느려진다.
+    //   실제 풍속으로 치면 "바람이 세게 분다" 수준이라 먼지가 날리는
+    //   건 보이되 휘몰아치지는 않는다.
+    public const float SpeedMin = 5.6f;
+    public const float SpeedMax = 12.2f;
 
     // 대표 풍속 (중간값, m/s). 잔디/안개/구름이 여기 맞춘다.
     public static float WindSpeed => (SpeedMin + SpeedMax) * 0.5f;
@@ -241,9 +242,13 @@ public static class SetupDustParticles
         //
         // damping 을 끈다. 켜 두면 노이즈가 속도에 비례해 감쇠되는데,
         // 바람이 빠를수록 난류가 죽어서 빠른 입자일수록 더 직선이 된다.
+        //   풍속을 낮추면 여기도 같이 낮춰야 한다. 난류는 절대값이 아니라
+        //   바람과의 비로 각도가 정해지기 때문이다. 3.2~5.6 을 그대로 두고
+        //   풍속만 14.75 -> 8.9 로 내리면 ±20~32도까지 휘어 궤적이 산만해진다.
+        //   2.05~3.42 면 ±13~21도로 예전 느낌이 유지된다.
         var noise = ps.noise;
         noise.enabled = true;
-        noise.strength = new ParticleSystem.MinMaxCurve(3.2f, 5.6f);
+        noise.strength = new ParticleSystem.MinMaxCurve(2.05f, 3.42f);
         noise.frequency = 0.42f;
         noise.scrollSpeed = new ParticleSystem.MinMaxCurve(1.4f);
         noise.quality = ParticleSystemNoiseQuality.Medium;

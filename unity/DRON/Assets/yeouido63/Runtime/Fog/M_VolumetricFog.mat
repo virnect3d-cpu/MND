@@ -32,13 +32,13 @@ Material:
     - _DensityMultiplier: 1.15
     - _DensityThreshold: 0.46
     - _HeightBase: 2
-    - _HeightFalloff: 0.02
+    - _HeightFalloff: 0.035
     - _LightScattering: 0.35
     - _MaxDistance: 1200
     - _NoiseOffset: 1
     - _NoiseTiling: 0.55
     - _StepSize: 22
-    - _WindSpeed: 6.275
+    - _WindSpeed: 4.45
     m_Colors:
     - _Color: {r: 0.63, g: 0.64, b: 0.66, a: 1}
     - _LightContribution: {r: 0.32, g: 0.32, b: 0.33, a: 1}

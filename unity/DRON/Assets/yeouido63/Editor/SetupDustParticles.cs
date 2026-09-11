@@ -60,6 +60,20 @@ public static class SetupDustParticles
     const float Rate         = 2100f;
     const float LifeTime     = 2.6f;
 
+    // 바람 — 이 씬의 기준값이다.
+    //
+    //   먼지/잔디/구름이 각자 다른 방향·속도로 움직이면 같은 바람이
+    //   아니라 서로 다른 현상 셋으로 보인다. 여기 한 곳에서 정하고
+    //   SyncWind 가 잔디와 구름에 같은 값을 먹인다.
+    //
+    //   45 도 방향의 X/Z 성분. 속력 9.3~20.2 m/s 를 유지하면서 각도만
+    //   돌린 값이라 성분은 속력/sqrt(2) 다.
+    public const float WindMin = 6.6f;
+    public const float WindMax = 14.32f;
+
+    // 잔디/구름이 맞춰야 할 대표 풍속 (중간값 기준, m/s)
+    public static float WindSpeed => Mathf.Sqrt(2f) * (WindMin + WindMax) * 0.5f;
+
     [DidReloadScripts]
     static void OnReload()
     {
@@ -141,18 +155,24 @@ public static class SetupDustParticles
         shape.scale = BoxSize;
         shape.position = new Vector3(-BoxSize.x * 0.25f, 0f, BoxSize.z * 0.35f);
 
-        // 바람 — 볼류메트릭 안개와 같은 방향(+X, 약간 +Z)으로 흘려야
-        // 둘이 따로 노는 것처럼 보이지 않는다.
+        // 바람 — 볼류메트릭 안개, 잔디, 구름과 같은 방향으로 흘려야
+        // 넷이 따로 노는 것처럼 보이지 않는다.
         //
-        // 강풍이라 속도를 크게 올렸다(1.4~3.2 -> 9~19 m/s). 참고로 이 정도면
-        // 실제 풍속으로 초속 10~19m — 강풍주의보 수준이다.
+        // 방향을 XZ 평면에서 45 도로 맞췄다. 이전에는 x 9~19 / z 2.5~7 이라
+        // 실제 각도가 19 도쯤이었고, 화면을 거의 가로로만 지나가서
+        // 깊이감이 없었다. 45 도면 화면 안쪽으로도 밀려 들어간다.
+        //
+        // 속력은 그대로 둔다(9.3~20.2 m/s). 방향만 돌리는 거라
+        // 각 성분을 속력/sqrt(2) 로 잡으면 크기가 보존된다.
+        // 그냥 z 를 x 와 같게 만들면 속력이 1.41 배 뛰어 더 사나워진다.
+        //
         // 개체마다 속도 편차를 크게 둬야 한 덩어리로 흐르지 않고 휘몰아친다.
         var vel = ps.velocityOverLifetime;
         vel.enabled = true;
         vel.space = ParticleSystemSimulationSpace.World;
-        vel.x = new ParticleSystem.MinMaxCurve(9f, 19f);
+        vel.x = new ParticleSystem.MinMaxCurve(WindMin, WindMax);
         vel.y = new ParticleSystem.MinMaxCurve(-1.6f, 2.2f);
-        vel.z = new ParticleSystem.MinMaxCurve(2.5f, 7f);
+        vel.z = new ParticleSystem.MinMaxCurve(WindMin, WindMax);
 
         // 흩날림 — 직선으로만 가면 비 오는 것처럼 보인다.
         // 속도를 올린 만큼 난류도 같이 키워야 "휭휭" 휘몰아치는 느낌이 난다.

@@ -49,6 +49,9 @@ public static class ExitPlayAndRun
     static void Run()
     {
         SetupDustParticles.Setup();
+        // 먼지를 심은 뒤에 동기화한다. SyncWind 가 먼지 값을 기준으로
+        // 잔디/구름을 맞추므로 순서가 바뀌면 한 박자 늦은 값을 읽는다.
+        SyncWind.Run();
         // 심은 직후 바로 찍는다. 한 번의 리프레시로 적용과 검증이 끝난다.
         EditorApplication.delayCall += CaptureGameView.Capture;
     }

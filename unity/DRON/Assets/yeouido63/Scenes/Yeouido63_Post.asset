@@ -371,14 +371,14 @@ MonoBehaviour:
     m_OverrideState: 1
     m_Value: 1.2
   globalOrientation:
-    m_OverrideState: 0
-    m_Value: 0
+    m_OverrideState: 1
+    m_Value: 45
   shapeSpeedMultiplier:
-    m_OverrideState: 0
+    m_OverrideState: 1
     m_Value: 1
   erosionSpeedMultiplier:
-    m_OverrideState: 0
-    m_Value: 0.25
+    m_OverrideState: 1
+    m_Value: 0.6
   altitudeDistortion:
     m_OverrideState: 0
     m_Value: 0.25

@@ -21,8 +21,21 @@ Shader "Yeouido63/GrassWind"
         _BaseColor      ("Tint", Color) = (1,1,1,1)
         _Smoothness     ("Smoothness", Range(0,1)) = 0.18
         _WindStrength   ("Wind Strength (m)", Range(0,1)) = 0.12
-        _WindSpeed      ("Wind Speed", Range(0,5)) = 1.3
+
+        // 속도는 먼지 풍속에서 역산한 값이다.
+        //
+        //   위상항이 sin(t*_WindSpeed + d*_WindFreq) 이므로 등위상선은
+        //   t*S + d*F = const, 즉 물결이 지면을 훑는 속도는 S/F [m/s] 다.
+        //   먼지 대표 풍속 14.79 m/s 에 맞추려면 S = 14.79 * F.
+        //   F=0.22 를 유지하면 S=3.25 다 (이전 1.3 은 5.9 m/s 라 먼지의 40%).
+        //
+        //   _WindSpeed 하나만 올리면 안 된다. 그건 "얼마나 빨리 떠느냐"고
+        //   눈에 보이는 바람 속도는 S/F 라서, F 를 같이 건드리면 도로 어긋난다.
+        _WindSpeed      ("Wind Speed", Range(0,5)) = 3.25
         _WindFreq       ("Wind Frequency", Range(0,2)) = 0.22
+        // 바람 방향 (XZ, 정규화해서 씀). 먼지 파티클과 같은 값을 넣어야
+        // 둘이 같은 바람으로 읽힌다 — SyncWind 가 맞춰 준다.
+        _WindDir        ("Wind Direction (XZ)", Vector) = (0.7071, 0, 0.7071, 0)
         _Cutoff         ("Alpha Cutoff", Range(0,1)) = 0.35
     }
 
@@ -50,6 +63,7 @@ Shader "Yeouido63/GrassWind"
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
                 float4 _BaseColor;
+                float4 _WindDir;
                 float  _Smoothness, _WindStrength, _WindSpeed, _WindFreq, _Cutoff;
             CBUFFER_END
 
@@ -75,11 +89,37 @@ Shader "Yeouido63/GrassWind"
                 // 밑둥 고정, 끝만 흔들림 (정점 컬러 A = 높이 가중치)
                 float sway = v.color.a;
                 float t = _Time.y * _WindSpeed;
-                // 월드 XZ 로 위상을 어긋내 바람이 훑고 가게 한다
-                float phase = (posWS.x + posWS.z) * _WindFreq;
-                float2 off;
-                off.x = sin(t + phase) + 0.35 * sin(t * 2.3 + phase * 1.7);
-                off.y = cos(t * 0.8 + phase * 1.3);
+
+                // 바람 방향. 먼지와 같은 축으로 눕혀야 같은 바람으로 읽힌다.
+                float2 wdir = normalize(_WindDir.xz + 1e-6);
+                float2 wside = float2(-wdir.y, wdir.x);   // 직교축
+
+                // 위상은 바람을 따라 흐르는 거리로 준다.
+                //   예전엔 (x + z) 를 썼는데, 그건 항상 대각선 방향으로만
+                //   물결이 흘러서 바람 방향을 바꿔도 결이 따라오지 않았다.
+                //   바람 축에 투영하면 바람이 부는 쪽으로 결이 밀려간다.
+                float phase = dot(posWS.xz, wdir) * _WindFreq;
+
+                // 바람 축으로 눕고, 직교축으로는 살짝만 흔들린다.
+                //   예전엔 x 와 z 를 독립적으로 흔들어 끝이 원을 그렸다.
+                //   그래서 특정 방향으로 눕는 느낌이 없었다.
+                //   풀은 바람 방향으로 눕고 그 자리에서 떤다.
+                //
+                //   along 을 0 중심이 아니라 양수 쪽으로 치우치게 만든다.
+                //   sin 은 평균이 0 이라 앞뒤로 같은 만큼 흔들려서 바람이
+                //   아니라 진동으로 보인다. 상수 항을 더해 늘 바람 방향으로
+                //   기울어 있게 하고 그 위에서 흔들리게 한다.
+                //
+                //   계수는 계산해서 정했다. wave 는 두 사인의 합이라 범위가
+                //   -1.348 ~ +1.102 로 비대칭이다. 0.55 + 0.45*wave 로 뒀더니
+                //   최솟값이 -0.057 이라 한 순간 바람 반대로 눕었고, 그때
+                //   오프셋 각도가 45 도에서 -65 도로 튀었다.
+                //   0.62 + 0.38*wave 면 +0.108 ~ +1.039 라 늘 양수다.
+                float wave  = sin(t + phase) + 0.35 * sin(t * 2.3 + phase * 1.7);
+                float along = 0.62 + 0.38 * wave;         // 늘 눕되 세기가 출렁
+                float side  = 0.18 * cos(t * 0.8 + phase * 1.3);
+
+                float2 off = wdir * along + wside * side;
                 posWS.xz += off * sway * sway * _WindStrength;   // sway^2 = 끝으로 갈수록 급격히
 
                 o.positionWS = posWS;

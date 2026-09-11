@@ -34,7 +34,9 @@ public static class CaptureGameView
     }
 
     [MenuItem("Tools/Yeouido 63/화면 캡처")]
-    public static void Capture()
+    public static void Capture() { Capture("gameview"); }
+
+    public static void Capture(string name)
     {
         var cam = Camera.main;
         if (cam == null)
@@ -76,7 +78,7 @@ public static class CaptureGameView
             tex.Apply();
 
             Directory.CreateDirectory(OutDir);
-            string path = Path.Combine(OutDir, "gameview.png");
+            string path = Path.Combine(OutDir, name + ".png");
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Object.DestroyImmediate(tex);
 

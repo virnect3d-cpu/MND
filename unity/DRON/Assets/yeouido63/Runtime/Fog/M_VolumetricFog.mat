@@ -38,10 +38,10 @@ Material:
     - _NoiseOffset: 1
     - _NoiseTiling: 0.55
     - _StepSize: 22
-    - _WindSpeed: 7
+    - _WindSpeed: 7.396337
     m_Colors:
     - _Color: {r: 0.63, g: 0.64, b: 0.66, a: 1}
     - _LightContribution: {r: 0.32, g: 0.32, b: 0.33, a: 1}
-    - _WindDir: {r: 1, g: 0, b: 0.35, a: 0}
+    - _WindDir: {r: 0.70710677, g: 0, b: 0.70710677, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

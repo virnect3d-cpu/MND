@@ -56,3 +56,4 @@ public static class ExitPlayAndRun
         EditorApplication.delayCall += CaptureGameView.Capture;
     }
 }
+

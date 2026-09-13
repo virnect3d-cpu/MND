@@ -34,7 +34,7 @@ Material:
     - _HeightBase: 2
     - _HeightFalloff: 0.035
     - _LightScattering: 0.35
-    - _MaxDistance: 1200
+    - _MaxDistance: 900
     - _NoiseOffset: 1
     - _NoiseTiling: 0.55
     - _StepSize: 22

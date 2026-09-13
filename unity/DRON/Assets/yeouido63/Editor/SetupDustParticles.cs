@@ -135,7 +135,16 @@ public static class SetupDustParticles
     // 게 아니라 "지나가는" 것처럼 보인다.
     static int BuildHaze(GameObject root, Material mat)
     {
-        const int Count = 90;
+        // 90 -> 25 로 줄였다.
+        //
+        //   이 층이 세 층 중 제일 비싸다. 6000 개짜리 DUST_Mid 보다도 비싸다.
+        //   16m 짜리 빌보드가 카메라(고도 1.75m) 코앞에 떠 있으면 한 장이
+        //   화면을 통째로 덮는다. ZWrite 꺼진 알파 블렌딩이라 겹친 장수만큼
+        //   전체 화면 오버드로가 쌓인다 — 90 장이면 최악에 수십 배다.
+        //
+        //   크기도 6~16 -> 4~9 로 줄였다. 화면을 덮는 장수 자체를 줄여야
+        //   효과가 나온다.
+        const int Count = 25;
         var go = NewSystem(root, "DUST_Haze", out var ps);
 
         var main = ps.main;
@@ -144,18 +153,20 @@ public static class SetupDustParticles
         main.startLifetime = new ParticleSystem.MinMaxCurve(7f, 12f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.5f);
         // 크게. 알갱이가 아니라 공기 자체로 보여야 한다.
-        main.startSize = new ParticleSystem.MinMaxCurve(6f, 16f);
+        main.startSize = new ParticleSystem.MinMaxCurve(4f, 9f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
 
-        // 알파를 아주 낮게 눌러 둔다.
+        // 알파는 겹치는 장수에 반비례해서 잡는다.
         //
-        //   알파 0.035~0.075 로는 진했다. 시트가 6~16m 라 화면에서 여러 장이
-        //   겹치는데, 한 장이 옅어도 겹친 수만큼 누적된다. 90 장이
-        //   돌아다니므로 시야에 서너 장만 겹쳐도 체감 농도는 서너 배가 된다.
-        //   절반 아래로 내렸다.
+        //   시트가 커서 화면에서 여러 장이 겹치고, 한 장이 옅어도 겹친
+        //   수만큼 누적된다. 그래서 90 장 시절엔 0.035~0.075 가 진해서
+        //   절반 아래(0.032/0.015)로 눌렀었다.
+        //
+        //   이제 25 장이라 겹침이 1/3.6 로 줄었다. 같은 알파를 두면 헤이즈가
+        //   거의 사라진다. 3.6 배 올려 체감 농도를 맞춘다.
         main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(0.76f, 0.76f, 0.77f, 0.032f),
-            new Color(0.62f, 0.62f, 0.65f, 0.015f));
+            new Color(0.76f, 0.76f, 0.77f, 0.115f),
+            new Color(0.62f, 0.62f, 0.65f, 0.054f));
         main.maxParticles = Count;
         main.gravityModifier = 0f;
         main.simulationSpace = ParticleSystemSimulationSpace.World;

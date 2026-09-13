@@ -310,7 +310,7 @@ public static class PlantRooftopGrass
     {
         var s = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(s);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(s);
+        SceneSaver.Save(s, "잔디");
         AssetDatabase.SaveAssets();
     }
 }

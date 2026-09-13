@@ -68,7 +68,7 @@ public static class OptimizeAndDust
 
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        SceneSaver.Save(scene, "최적화");
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         Debug.Log("[최적화] 완료.");

@@ -57,7 +57,7 @@ public static class SetupSkyRotation
 
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        SceneSaver.Save(scene, "하늘회전");
 
         Debug.Log($"[하늘] '{sky.name}' 자전 켬. {rot.degreesPerSecond} 도/초 " +
                   $"(한 바퀴 {360f / rot.degreesPerSecond / 60f:F1} 분).");

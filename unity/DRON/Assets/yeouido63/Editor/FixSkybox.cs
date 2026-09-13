@@ -50,7 +50,7 @@ public static class FixSkybox
 
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        SceneSaver.Save(scene, "하늘");
 
         Debug.Log($"[하늘] 스카이박스를 '{sky.name}' 로 복구했다. " +
                   $"_Rotation={sky.GetFloat("_Rotation"):F1}");

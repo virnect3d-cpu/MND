@@ -125,6 +125,26 @@ public static class SetupYeouido63
             return;
         }
 
+        // 이 함수는 빈 씬을 새로 만들어 ScenePath 에 덮어쓴다.
+        //
+        //   처음 씬을 세울 때 쓰라고 만든 건데, 그 뒤로 씬에 잔디 8 배치와
+        //   먼지 3 층, 카메라 설정, 볼륨이 쌓였다. 지금 이걸 그냥 돌리면
+        //   그게 전부 사라지고 되돌릴 방법이 없다 — 메뉴를 잘못 누르는
+        //   것만으로 작업물이 날아간다.
+        //
+        //   그래서 기존 씬이 있으면 반드시 물어본다. 기본 선택은 취소다.
+        if (System.IO.File.Exists(ScenePath) &&
+            !EditorUtility.DisplayDialog(
+                "Yeouido 63 — 씬을 새로 만든다",
+                $"{ScenePath} 를 빈 씬으로 덮어쓴다.\n\n" +
+                "지금 씬에 있는 잔디 / 먼지 / 카메라 설정 / 볼륨이 전부 사라지고\n" +
+                "되돌릴 수 없다.\n\n정말 진행할까?",
+                "덮어쓴다", "취소"))
+        {
+            Debug.Log("[셋업] 취소했다. 씬은 그대로다.");
+            return;
+        }
+
         ConfigureImporter();
         ConfigureTextures(BakeDir);
         ConfigureTextures(TileDir);

@@ -121,7 +121,7 @@ public static class SetupReflectionProbe
         // 씬에 저장한 뒤 굽는다. 굽기는 비동기라 Lightmapping 에 맡긴다.
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        SceneSaver.Save(scene, "프로브");
 
         Debug.Log($"[프로브] 배치 완료 pos={pos} size={probe.size} res={probe.resolution}\n" +
                   "  이제 Window > Rendering > Lighting 에서 Generate Lighting 을 눌러 구워라.\n" +

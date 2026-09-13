@@ -120,7 +120,7 @@ public static class SetupDustParticles
 
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        SceneSaver.Save(scene, "먼지");
         AssetDatabase.SaveAssets();
 
         Debug.Log($"[먼지] 카메라({cam.name}) 자식으로 3 층 {total}개 심음. " +

@@ -100,7 +100,7 @@ public static class TuneGrass
 
         var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(scene);
-        UnityEditor.SceneManagement.EditorSceneManager.SaveScene(scene);
+        SceneSaver.Save(scene, "잔디튠");
         AssetDatabase.SaveAssets();
 
         Debug.Log($"[잔디튠] 메쉬 {meshes}개 / 포기 {clumps}개 처리(스케일 {Scale}배). " +

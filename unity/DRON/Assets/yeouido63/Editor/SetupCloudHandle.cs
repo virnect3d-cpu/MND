@@ -124,7 +124,7 @@ public static class SetupCloudHandle
 
         var scene = go.scene;
         EditorSceneManager.MarkSceneDirty(scene);
-        EditorSceneManager.SaveScene(scene);
+        SceneSaver.Save(scene, "구름");
 
         var p = go.transform.position;
         Debug.Log($"[구름] '{ObjName}' 준비됐다. " +

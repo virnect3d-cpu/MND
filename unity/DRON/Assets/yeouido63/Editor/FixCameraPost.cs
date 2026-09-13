@@ -73,11 +73,8 @@ public static class FixCameraPost
 
         if (fixedCount == 0) { Debug.Log("[카메라] 이미 정상이다"); return; }
 
-        // 플레이 중에는 씬 저장이 예외를 던진다. 조용히 건너뛴다 —
+        // 플레이 중이면 SceneSaver 가 경고만 남기고 건너뛴다.
         // 값은 이미 메모리에 들어갔으니 화면으로는 확인된다.
-        if (!EditorApplication.isPlaying)
-            EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene());
-        else
-            Debug.LogWarning("[카메라] 플레이 중이라 씬은 저장 안 했다. 나와서 다시 돌려라.");
+        SceneSaver.Save(EditorSceneManager.GetActiveScene(), "카메라");
     }
 }

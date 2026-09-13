@@ -293,8 +293,15 @@ public static class PlantRooftopGrass
         var col = AssetDatabase.LoadAssetAtPath<Texture2D>(TexDir + "/Grass003_Color.png");
         if (col != null) m.SetTexture("_BaseMap", col);
         if (m.HasProperty("_WindStrength")) m.SetFloat("_WindStrength", 0.12f);
-        if (m.HasProperty("_WindSpeed"))    m.SetFloat("_WindSpeed", 1.3f);
         if (m.HasProperty("_Smoothness"))   m.SetFloat("_Smoothness", 0.18f);
+
+        // _WindSpeed / _WindDir / _WindFreq 는 여기서 안 쓴다 — SyncWind 소유다.
+        //
+        //   여기 1.3 을 박아 두면 잔디를 다시 심을 때마다 바람 동기화가
+        //   맞춰 놓은 값(현재 2.48)을 되돌린다. 게다가 잔디의 _WindSpeed 는
+        //   속도가 아니라 진동수라, 물결이 지면을 훑는 속도는 _WindSpeed/_WindFreq
+        //   다. 두 값을 같이 정하지 않으면 먼지와 속도가 어긋난다.
+        //   심은 뒤 Tools/Yeouido 63/바람 동기화 를 돌리면 채워진다.
         EditorUtility.SetDirty(m);
         return m;
     }

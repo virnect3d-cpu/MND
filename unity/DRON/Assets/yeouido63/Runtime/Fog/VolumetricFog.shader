@@ -7,8 +7,12 @@
 // 원본에서 바꾼 것 — 왜
 //   1) 레이마칭 루프에 반복 상한(MAX_STEPS)을 걸었다.
 //      원본은 `while (distTravelled < distLimit)` 뿐이라 _StepSize 를 작게
-//      주거나 _MaxDistance 를 크게 주면 루프가 수만 번 돈다. 이 씬은 far clip
-//      이 30000m 라 그냥 두면 GPU 가 멈춘다(TDR).
+//      주거나 _MaxDistance 를 크게 주면 루프가 수만 번 돈다.
+//      주의: MAX_STEPS 는 실제로 걸리는 상한이 아니다. 154행의
+//      max(_StepSize, distLimit/MAX_STEPS) 가 스텝 크기의 하한을 잡아 주므로
+//      반복 수를 실제로 정하는 건 _StepSize 다. 지금 값(22, 거리 1200)에서
+//      반복은 55 회고 128 에는 닿지 않는다. 128 은 _StepSize 를 아주 작게
+//      줬을 때만 의미가 있는 안전장치다.
 //   2) 스텝 수를 거리에 맞춰 정규화했다. 상한에 걸리면 스텝을 늘려서
 //      "가까운 데만 포그가 끼는" 현상 대신 전체가 옅어지게 한다.
 //   3) 하늘(depth == 0/1) 픽셀에서 worldPos 가 무한대로 튀는 걸 막았다.
@@ -17,9 +21,16 @@
 //   4) 노이즈 3D 텍스처가 없을 때를 대비해 절차적 폴백을 넣었다.
 //
 // 씬 맥락
-//   63빌딩 항공 시점. 카메라가 지상 280m 근처, 대상까지 수백 m~수 km 다.
-//   _MaxDistance 는 2000~4000 정도가 맞다. 기본 씬 포그(Linear 100~4200)와
-//   겹치므로 둘 다 켜면 과해진다 — 이 셰이더를 쓸 거면 씬 포그는 줄여라.
+//   이 주석은 원래 항공 시점(카메라 고도 280m, far clip 30000) 기준으로
+//   쓰였는데, 그건 지금 비활성인 CAM_63_Air 얘기다. 실제로 쓰는 카메라는
+//   옥상 눈높이의 main_came 이고 far clip 이 1000, 고도가 1.75m 다.
+//
+//   그래서 _MaxDistance 는 far clip 을 넘길 이유가 없다. 1200 으로 두면
+//   씬에 아무것도 없는 200m 구간을 스텝 9 개나 더 도는 낭비다.
+//
+//   씬 포그(Linear)와 겹치면 과해지니 둘 다 켜지 마라. 현재 씬 포그는
+//   start 1800 이라 far clip 1000 안에서는 한 번도 안 걸린다 — 꺼도 화면이
+//   안 변하고 셰이더 배리언트만 줄어든다.
 
 Shader "Yeouido63/VolumetricFog"
 {
@@ -39,7 +50,11 @@ Shader "Yeouido63/VolumetricFog"
         // 황사용 — 안개를 바람에 흘리고 고도에 따라 옅게 만든다
         _WindDir            ("Wind direction (XZ)", Vector) = (1, 0, 0.35, 0)
         _WindSpeed          ("Wind speed (m/s)", Range(0, 30)) = 6
-        _HeightFalloff      ("Height falloff (1/m)", Range(0, 0.02)) = 0.0025
+        // 상한 0.02 는 낮았다. 구름 고도(250m)의 아지랑이를 죽이려면 0.035 가
+        // 필요한데, SetFloat 은 Range 를 무시해서 코드로는 들어가지만
+        // 인스펙터 슬라이더를 한 번 건드리면 0.02 로 스냅돼 되돌아간다.
+        // 값이 왜 혼자 바뀌었는지 찾기 어려운 종류의 함정이라 상한을 올린다.
+        _HeightFalloff      ("Height falloff (1/m)", Range(0, 0.05)) = 0.0025
         _HeightBase         ("Height base (world Y)", float) = 0
     }
 
@@ -83,8 +98,12 @@ Shader "Yeouido63/VolumetricFog"
             // 전방 산란이 강한 안개일수록 빛 쪽이 밝게 빛난다
             float henyey_greenstein(float angle, float scattering)
             {
-                return (1.0 - angle * angle) /
-                       (4.0 * PI * pow(1.0 + scattering * scattering - (2.0 * scattering) * angle, 1.5f));
+                // scattering=1 이고 빛을 정면으로 보면 밑이 1+1-2 = 0 이 되어
+                // pow(0,1.5)=0, 즉 0 으로 나눈다. _LightScattering 슬라이더가
+                // 1 까지 열려 있어서 도달 가능한 값이다 — 현재 0.35 라 여유가
+                // 있지만 끝까지 밀면 화면에 inf 가 터진다. 하한을 잡아 둔다.
+                float denom = 1.0 + scattering * scattering - (2.0 * scattering) * angle;
+                return (1.0 - angle * angle) / (4.0 * PI * pow(max(1e-4, denom), 1.5f));
             }
 
             float get_density(float3 worldPos)

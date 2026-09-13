@@ -237,16 +237,22 @@ public static class OptimizeAndDust
         if (mat.HasProperty("_NoiseTiling"))       mat.SetFloat("_NoiseTiling", 0.55f);
         if (mat.HasProperty("_NoiseOffset"))       mat.SetFloat("_NoiseOffset", 1f);
 
-        // 바람 — 옥상 잔디가 흔들리는 방향과 대충 맞춰 둔다.
-        if (mat.HasProperty("_WindDir"))   mat.SetVector("_WindDir", new Vector4(1f, 0f, 0.35f, 0f));
-        if (mat.HasProperty("_WindSpeed")) mat.SetFloat("_WindSpeed", 7f);
-
-        // 고도 감쇠 — 지상에서 짙고 옥상(Y 279m) 위로는 옅어진다.
-        // 0.0042 로는 옥상에서 0.31 배라 여전히 뿌옇게 보였다. 0.0062 로 올리면
-        // exp(-279 * 0.0062) = 0.18 — 옥상 높이에서 5 분의 1 이 된다.
-        // 카메라가 옥상 근처에 있으므로 이 값이 체감에 가장 크게 작용한다.
-        if (mat.HasProperty("_HeightFalloff")) mat.SetFloat("_HeightFalloff", 0.0062f);
-        if (mat.HasProperty("_HeightBase"))    mat.SetFloat("_HeightBase", 0f);
+        // 바람과 고도 감쇠는 여기서 안 쓴다 — SyncWind 소유다.
+        //
+        //   예전엔 여기서 _WindDir/_WindSpeed/_HeightFalloff/_HeightBase 를
+        //   전부 썼다. 그 값들이 SyncWind 와 정면으로 부딪혔다.
+        //     _WindDir        (1, 0, 0.35) 하드코딩  vs  각도에서 계산
+        //     _WindSpeed      7.0                    vs  풍속의 절반
+        //     _HeightFalloff  0.0062                 vs  0.035
+        //     _HeightBase     0                      vs  2
+        //
+        //   특히 0.0062 는 구름 고도에서 밀도배율이 0.21 이라 하늘이
+        //   계속 일렁였다 — 아지랑이의 원인으로 지목돼 0.035 로 올린
+        //   바로 그 값이다. 이 스크립트를 SyncWind 뒤에 돌리면 고쳐 놓은
+        //   걸 되돌린다.
+        //
+        //   바람 방향은 먼지·잔디·안개가 한 값에서 나와야 하므로
+        //   SyncWind 한 곳에만 둔다.
 
         // 3D 노이즈가 안 물려 있으면 안개가 균일한 판이 된다
         if (mat.HasProperty("_FogNoise") && mat.GetTexture("_FogNoise") == null)
@@ -289,7 +295,10 @@ public static class OptimizeAndDust
             // 색이 바뀌는 게 보인다.
             RenderSettings.fogColor = new Color(0.66f, 0.67f, 0.69f, 1f);
 
-            Debug.Log($"[황사] Linear 안개 start {beforeStart} -> 900 / end {beforeEnd} -> 7000, 색 맞춤");
+            // 숫자를 문자열에 박지 않는다. 900 이라고 적어 둔 채 코드만
+            // 1800 으로 바뀌어서, 로그만 보면 적용이 안 된 줄 알기 쉬웠다.
+            Debug.Log($"[황사] Linear 안개 start {beforeStart} -> {RenderSettings.fogStartDistance} / " +
+                      $"end {beforeEnd} -> {RenderSettings.fogEndDistance}, 색 맞춤");
         }
     }
 }

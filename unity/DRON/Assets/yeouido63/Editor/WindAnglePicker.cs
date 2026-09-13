@@ -77,11 +77,15 @@ public class WindAnglePicker : EditorWindow
         EditorGUILayout.LabelField("자주 쓰는 각도", EditorStyles.miniBoldLabel);
         using (new EditorGUILayout.HorizontalScope())
         {
+            // "현재" 라벨을 30 도에 박아 뒀다가 기본값이 270 으로 바뀌면서
+            // 거짓말이 됐다. 눌러 보면 240 도가 홱 돌아간다.
+            // 코드에서 읽어 붙인다 — 기본값이 바뀌어도 따라온다.
             foreach (var (deg, label) in new[] {
-                (0f, "0\n→X"), (30f, "30\n현재"), (90f, "90\n→Z"),
+                (0f, "0\n→X"), (30f, "30"), (90f, "90\n→Z"),
                 (180f, "180\n←X"), (270f, "270\n←Z") })
             {
-                if (GUILayout.Button(label, GUILayout.Height(34)))
+                bool isDefault = Mathf.Approximately(deg, SyncWind.WindAngleDeg);
+                if (GUILayout.Button(isDefault ? label + "\n기본" : label, GUILayout.Height(34)))
                 { _angle = deg; Apply(); }
             }
         }

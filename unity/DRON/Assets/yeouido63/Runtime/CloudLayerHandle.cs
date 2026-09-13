@@ -36,6 +36,7 @@
 //   대신 오버라이드 스위치를 반드시 같이 켠다. 값만 쓰고 스위치가 꺼져
 //   있으면 조용히 무시되는 게 이 시스템에서 제일 흔한 함정이다.
 
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -127,17 +128,25 @@ public class CloudLayerHandle : MonoBehaviour
 #endif
     }
 
-#if UNITY_EDITOR
     void OnDisable()
     {
+#if UNITY_EDITOR
         UnityEditor.EditorApplication.update -= EditorTick;
+#endif
     }
 
+#if UNITY_EDITOR
     void EditorTick()
     {
         if (this == null) { UnityEditor.EditorApplication.update -= EditorTick; return; }
         if (!isActiveAndEnabled || Application.isPlaying) return;
         if (driftSpeed <= 0f || !driftInEditMode) return;
+
+        // 컴파일/임포트 중에는 큐잉하지 않는다. 그 사이에 매 틱 플레이어
+        // 루프를 돌리면 임포트가 눈에 띄게 느려진다.
+        if (UnityEditor.EditorApplication.isCompiling ||
+            UnityEditor.EditorApplication.isUpdating) return;
+
         UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
     }
 #endif
@@ -199,11 +208,50 @@ public class CloudLayerHandle : MonoBehaviour
             if (vol != null) profile = vol.sharedProfile;
         }
         _clouds = null;
+        _params.Clear();
         if (profile == null) return;
 
         foreach (var c in profile.components)
             if (c != null && c.GetType().Name == CloudTypeName) { _clouds = c; break; }
+
+        if (_clouds != null) CacheParams();
     }
+
+    // 파라미터를 한 번만 찾아 둔다.
+    //
+    //   예전엔 Apply() 가 매 프레임 GetType().GetField(name) 을 7 번씩 돌았다.
+    //   드리프트가 켜져 있으면 그게 매 프레임이라 순수한 낭비였다.
+    //   필드 구성은 Resolve 시점에 고정되므로 여기서 잡아 둔다.
+    //
+    //   못 찾으면 여기서 한 번 경고한다. 예전엔 조용히 넘어가서, 패키지가
+    //   필드명을 바꾸면 구름이 그냥 안 움직이고 단서가 하나도 안 남았다.
+    void CacheParams()
+    {
+        // Public 만으로는 패키지가 private + 프로퍼티로 리팩터하면 놓친다.
+        // 같은 패키지의 m_CloudPreset 이 이미 그 패턴이라 가정이 아니다.
+        const BindingFlags Flags = BindingFlags.Public | BindingFlags.NonPublic
+                                 | BindingFlags.Instance;
+
+        var missing = new List<string>();
+        foreach (var name in ParamNames)
+        {
+            var f = _clouds.GetType().GetField(name, Flags);
+            if (f == null) { missing.Add(name); continue; }
+            _params[name] = f.GetValue(_clouds);
+        }
+
+        if (missing.Count > 0)
+            Debug.LogWarning($"[구름] 파라미터를 못 찾았다: {string.Join(", ", missing)}. " +
+                             "볼류메트릭 구름 패키지 버전이 바뀐 것 같다.");
+    }
+
+    static readonly string[] ParamNames =
+    {
+        "bottomAltitude", "altitudeRange", "shapeOffset", "densityMultiplier",
+        "globalSpeed", "shapeSpeedMultiplier", "erosionSpeedMultiplier", "globalOrientation",
+    };
+
+    readonly Dictionary<string, object> _params = new();
 
     /// <summary>인스펙터/Transform 값을 프로파일에 밀어 넣는다.</summary>
     public void Apply()
@@ -231,10 +279,14 @@ public class CloudLayerHandle : MonoBehaviour
 
         if (driveOrientation)
         {
-            // globalOrientation 은 북(+Z)에서 시계방향으로 재는 나침반식이고
-            // Transform 의 Y 오일러각은 +Z 에서 +X 로 도는 같은 방향이라
-            // 값 자체는 그대로 통한다. 다만 0~360 으로 감아야 한다 —
-            // ClampedFloatParameter(0,360) 이라 음수는 0 으로 잘린다.
+            // globalOrientation 의 기준축은 +X 다 (VolumetricCloudsURP.cs:582-584
+            // 에서 cos/sin 을 그대로 쓴다). Transform 의 Y 오일러각도 +X 에서
+            // 시작하는 같은 규약이라 값이 그대로 통한다.
+            // 0~360 으로 감는다 — ClampedFloatParameter(0,360) 이라 음수는 0 으로 잘린다.
+            //
+            // 주의: 이걸 켜면 SyncWind 가 바람 각도로 정한 방위를 매 프레임
+            // 덮는다. 구름만 먼지·잔디와 다른 방향으로 흐르게 되므로
+            // 방위를 따로 돌리고 싶을 때만 켜라.
             Set("globalOrientation", Mathf.Repeat(transform.eulerAngles.y, 360f));
         }
 
@@ -283,46 +335,40 @@ public class CloudLayerHandle : MonoBehaviour
     // overrideState 가 꺼진 채 value 만 쓰면 렌더러가 그 값을 아예 안 읽는다.
     // 그래서 쓸 때마다 둘 다 세팅한다.
 
-    FieldInfo Field(string name) => _clouds.GetType().GetField(name);
+    // 캐시에는 FieldInfo 가 아니라 VolumeParameter 객체 자체가 들어 있다.
+    // 그 객체는 오버라이드를 갈아끼우지 않는 한 그대로 살아 있으므로
+    // 매 프레임 리플렉션이 아예 사라진다.
+    T Param<T>(string name) where T : class
+        => _params.TryGetValue(name, out var p) ? p as T : null;
 
     void Set(string name, float v)
     {
-        var f = Field(name);
-        if (f == null) return;
-        if (f.GetValue(_clouds) is VolumeParameter<float> param)
-        {
-            param.value = v;
-            param.overrideState = true;
-        }
+        var param = Param<VolumeParameter<float>>(name);
+        if (param == null) return;
+        param.value = v;
+        param.overrideState = true;
     }
 
     void SetVec3(string name, Vector3 v)
     {
-        var f = Field(name);
-        if (f == null) return;
-        if (f.GetValue(_clouds) is VolumeParameter<Vector3> param)
-        {
-            param.value = v;
-            param.overrideState = true;
-        }
+        var param = Param<VolumeParameter<Vector3>>(name);
+        if (param == null) return;
+        param.value = v;
+        param.overrideState = true;
     }
 
     bool TryGet(string name, out float v)
     {
-        v = 0f;
-        var f = Field(name);
-        if (f == null) return false;
-        if (f.GetValue(_clouds) is VolumeParameter<float> param) { v = param.value; return true; }
-        return false;
+        var param = Param<VolumeParameter<float>>(name);
+        v = param?.value ?? 0f;
+        return param != null;
     }
 
     bool TryGetVec3(string name, out Vector3 v)
     {
-        v = Vector3.zero;
-        var f = Field(name);
-        if (f == null) return false;
-        if (f.GetValue(_clouds) is VolumeParameter<Vector3> param) { v = param.value; return true; }
-        return false;
+        var param = Param<VolumeParameter<Vector3>>(name);
+        v = param?.value ?? Vector3.zero;
+        return param != null;
     }
 
     // --- 씬 뷰 ---------------------------------------------------------

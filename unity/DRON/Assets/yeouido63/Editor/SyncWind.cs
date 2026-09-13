@@ -176,15 +176,24 @@ public static class SyncWind
 
             var so = new SerializedObject(comp);
 
-            // 방향. globalOrientation 은 도 단위인데 기준축이 우리 XZ 각도와
-            // 다르다 — 북(+Z)에서 시계방향으로 재는 나침반식이다.
-            // 우리 각도는 +X 에서 +Z 로 잰 값이라 나침반으로는 90-각도다.
-            // 이 변환을 빼먹으면 구름만 엉뚱한 데로 흐른다.
+            // 방향. globalOrientation 은 도 단위이고 기준축은 +X 다 —
+            // 우리 XZ 각도와 같은 규약이라 변환이 필요 없다.
             //
-            // 0~360 으로 감아 준다. 이 파라미터는 ClampedFloatParameter(0,360)
-            // 이라 음수면 0 으로 잘린다 — 각도가 90 을 넘으면
-            // 90-각도가 음수가 되므로 감지 않으면 구름만 엉뚱한 데로 흐른다.
-            float compass = Mathf.Repeat(90f - Angle, 360f);
+            //   예전엔 "나침반식(+Z 기준)이라 90-각도로 바꿔야 한다" 고 보고
+            //   Repeat(90 - Angle, 360) 을 넣었는데 틀렸다. 그래서 바람이
+            //   270 도(-Z)일 때 구름에는 180 도(-X)가 들어가 구름만 90 도
+            //   어긋난 방향으로 흘렀다.
+            //
+            //   근거는 패키지 코드다. VolumetricCloudsURP.cs:582-584 에서
+            //     theta = globalOrientation / 180 * PI
+            //     windDirection = (cos theta, sin theta)
+            //   그대로 cos/sin 을 쓴다. 즉 0 도가 +X 다. 같은 파일 579/609 의
+            //   마이너스 두 개는 "이동 방향이 맞게 보이도록" 하는 보정이라
+            //   기준축을 바꾸지 않는다.
+            //
+            // 0~360 으로 감아 준다. ClampedFloatParameter(0,360) 이라
+            // 음수면 0 으로 잘린다.
+            float compass = Mathf.Repeat(Angle, 360f);
             SetParam(so, "globalOrientation", compass);
 
             // 속도와 고도는 여기서 안 쓴다 — CloudLayerHandle 소유다.

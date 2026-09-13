@@ -19,23 +19,26 @@ Shader "Yeouido63/GrassWind"
     {
         _BaseMap        ("Base Map", 2D) = "white" {}
         _BaseColor      ("Tint", Color) = (1,1,1,1)
-        _Smoothness     ("Smoothness", Range(0,1)) = 0.18
+        // _Smoothness 가 여기 있었는데 frag 에서 한 번도 안 읽혔다.
+        // 잔디는 램버트 + wrap 만 쓰고 스페큘러가 없다. 인스펙터에
+        // 슬라이더만 뜨고 아무 일도 안 일어나서 걷어냈다.
         _WindStrength   ("Wind Strength (m)", Range(0,1)) = 0.12
 
         // 속도는 먼지 풍속에서 역산한 값이다.
         //
         //   위상항이 sin(t*_WindSpeed + d*_WindFreq) 이므로 등위상선은
         //   t*S + d*F = const, 즉 물결이 지면을 훑는 속도는 S/F [m/s] 다.
-        //   먼지 대표 풍속 14.79 m/s 에 맞추려면 S = 14.79 * F.
-        //   F=0.22 를 유지하면 S=3.25 다 (이전 1.3 은 5.9 m/s 라 먼지의 40%).
+        //   먼지 대표 풍속에 맞추려면 S = 풍속 * F 가 되어야 한다.
         //
         //   _WindSpeed 하나만 올리면 안 된다. 그건 "얼마나 빨리 떠느냐"고
         //   눈에 보이는 바람 속도는 S/F 라서, F 를 같이 건드리면 도로 어긋난다.
         //
-        //   상한을 5 -> 20 으로 올렸다. F 를 키워 결을 촘촘하게 만들면
-        //   같은 물결 속도를 내는 데 S = 14.79 * F 가 필요한데,
-        //   F=0.62 에서 이미 9.2 라 5 에 잘려 조용히 느려졌다.
-        _WindSpeed      ("Wind Speed", Range(0,20)) = 9.17
+        //   기준 풍속이 14.79 -> 4.0 m/s 로 내려왔다 (SetupDustParticles 의
+        //   SpeedMin/Max 2.5~5.5 평균). F=0.62 면 S = 4.0*0.62 = 2.48 이고
+        //   머티리얼에도 그 값이 들어 있다. 아래 기본값 9.17 은 옛 14.79
+        //   기준이라 머티리얼을 안 거치고 이 셰이더를 쓰면 3.7 배 빨라진다.
+        //   상한 20 도 옛 기준의 잔재라 지금은 한참 남는다.
+        _WindSpeed      ("Wind Speed", Range(0,20)) = 2.48
         // 파장 = 2pi/F. 0.22 는 파장 28.6 m 로 옥상 폭(약 30m)과 거의 같아
         // 잔디가 통째로 한 덩어리처럼 눕고 결이 안 보였다 — 그게 "직선으로
         // 흐른다" 는 인상의 큰 원인이다. 0.62 면 파장 10.1 m 로 화면 안에
@@ -72,7 +75,7 @@ Shader "Yeouido63/GrassWind"
                 float4 _BaseMap_ST;
                 float4 _BaseColor;
                 float4 _WindDir;
-                float  _Smoothness, _WindStrength, _WindSpeed, _WindFreq, _Cutoff;
+                float  _WindStrength, _WindSpeed, _WindFreq, _Cutoff;
             CBUFFER_END
 
             struct Attributes {
@@ -150,8 +153,16 @@ Shader "Yeouido63/GrassWind"
                 // 잎 반폭. 0.5 는 쿼드를 꽉 채우는 값이라 잎이 두툼했다.
                 // 0.3 이면 밑둥 폭이 60% 로 줄어 가늘어진다.
                 float blade = step(abs(c.x), taper * 0.3);
-                float noise = frac(sin(dot(floor(i.uv * 8.0), float2(12.9898, 78.233))) * 43758.5453);
-                clip(blade * (noise * 0.4 + 0.6) - _Cutoff);
+                // 여기 잎끝을 랜덤하게 뜯어내려고 해시 노이즈를 곱했었다.
+                //   clip(blade * (noise * 0.4 + 0.6) - _Cutoff)
+                // 그런데 blade 가 step() 이라 0 아니면 1 이고, 노이즈 항은
+                // [0.6, 1.0] 범위였다. _Cutoff 가 0.35 라 blade=1 이면 항상
+                // 통과하고 blade=0 이면 항상 탈락 — 노이즈가 결과를 한 번도
+                // 못 바꿨다. sin/frac/dot 을 매 픽셀 계산해서 버린 셈이고
+                // Cull Off 라 그게 잎당 두 번이었다.
+                // 되살리려면 _Cutoff 를 0.6 위로 올려야 한다. 지금은 잎 실루엣이
+                // 충분히 가늘어서 필요 없다고 보고 걷어낸다.
+                clip(blade - _Cutoff);
 
                 float3 nWS = normalize(i.normalWS);
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(i.positionWS));

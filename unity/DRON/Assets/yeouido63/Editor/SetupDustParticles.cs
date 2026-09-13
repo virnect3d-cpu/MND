@@ -143,14 +143,16 @@ public static class SetupDustParticles
         main.loop = true;
         main.startLifetime = new ParticleSystem.MinMaxCurve(7f, 12f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f, 0.5f);
-        // 크게. 알갱이로 보이면 안 되므로 알파를 아주 낮게 눌러 둔다.
-        //
-        //   0.035~0.075 는 진했다. 시트가 6~16m 라 화면에서 여러 장이
-        //   겹치는데, 한 장의 알파가 낮아도 겹친 수만큼 누적된다.
-        //   90 장이 돌아다니므로 시야에 서너 장만 겹쳐도 체감 농도는
-        //   서너 배가 된다. 절반 아래로 내린다.
+        // 크게. 알갱이가 아니라 공기 자체로 보여야 한다.
         main.startSize = new ParticleSystem.MinMaxCurve(6f, 16f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+
+        // 알파를 아주 낮게 눌러 둔다.
+        //
+        //   알파 0.035~0.075 로는 진했다. 시트가 6~16m 라 화면에서 여러 장이
+        //   겹치는데, 한 장이 옅어도 겹친 수만큼 누적된다. 90 장이
+        //   돌아다니므로 시야에 서너 장만 겹쳐도 체감 농도는 서너 배가 된다.
+        //   절반 아래로 내렸다.
         main.startColor = new ParticleSystem.MinMaxGradient(
             new Color(0.76f, 0.76f, 0.77f, 0.032f),
             new Color(0.62f, 0.62f, 0.65f, 0.015f));

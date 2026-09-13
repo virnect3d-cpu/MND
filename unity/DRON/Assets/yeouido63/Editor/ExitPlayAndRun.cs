@@ -39,16 +39,51 @@ public static class ExitPlayAndRun
         Run();
     }
 
+    // 플레이가 끝난 뒤 몇 프레임 더 기다린다.
+    //
+    //   isPlaying 만 보고 바로 진행했더니 씬에서 먼지 오브젝트 4 개가
+    //   통째로 사라진 채 저장된 적이 있다. 플레이 종료 직후에는 도메인
+    //   리로드와 씬 되돌리기가 아직 돌고 있어서, 그 틈에 Setup 이
+    //   기존 오브젝트를 지우고 새로 심으면 삭제만 남고 생성이 날아간다.
+    //
+    //   isPlayingOrWillChangePlaymode 까지 확인하고, 그 뒤로도 몇 프레임
+    //   여유를 둔다.
+    const int SettleFrames = 10;
+    static int _settle;
+
     static void WaitThenRun()
     {
-        if (EditorApplication.isPlaying) return;   // 아직 빠져나오는 중
+        if (EditorApplication.isPlaying ||
+            EditorApplication.isPlayingOrWillChangePlaymode ||
+            EditorApplication.isCompiling ||
+            EditorApplication.isUpdating)
+        {
+            _settle = 0;
+            return;
+        }
+
+        if (_settle++ < SettleFrames) return;
+
         EditorApplication.update -= WaitThenRun;
+        _settle = 0;
         EditorApplication.delayCall += Run;
     }
 
     static void Run()
     {
         SetupDustParticles.Setup();
+
+        // 심은 결과를 확인한다. 한 번 통째로 날아간 적이 있어서,
+        // 조용히 실패하면 다음 커밋에 "삭제" 로 남는다.
+        var root = GameObject.Find("DUST_Particles");
+        int layers = root == null ? 0 : root.GetComponentsInChildren<ParticleSystem>(true).Length;
+        if (layers < 3)
+        {
+            Debug.LogError($"[적용] 먼지가 제대로 안 심겼다 (층 {layers}/3). " +
+                           "씬을 저장하지 말고 Tools/Yeouido 63 에서 다시 돌려라.");
+            return;
+        }
+
         // 먼지를 심은 뒤에 동기화한다. SyncWind 가 먼지 값을 기준으로
         // 잔디/구름을 맞추므로 순서가 바뀌면 한 박자 늦은 값을 읽는다.
         SyncWind.Run();
@@ -56,4 +91,3 @@ public static class ExitPlayAndRun
         EditorApplication.delayCall += CaptureGameView.Capture;
     }
 }
-

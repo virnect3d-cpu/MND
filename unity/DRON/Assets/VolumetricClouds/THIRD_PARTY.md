@@ -1,8 +1,23 @@
 # 서드파티 코드
 
 이 폴더는 외부 프로젝트를 그대로 가져온 것이다. **직접 수정하지 마라** —
-업스트림을 갱신할 때 충돌한다. 이 씬에 맞춘 설정은 전부
-`Assets/yeouido63/Editor/SetupVolumetrics.cs` 에 있다.
+업스트림을 갱신할 때 충돌한다.
+
+이 씬에 맞춘 설정은 값마다 소유자가 다르다. 고칠 때 그 파일만 고쳐라.
+한 값을 두 스크립트가 쓰면 나중에 돈 쪽이 이겨서 조용히 되돌아간다
+(실제로 짙기·스텝·안개 사거리에서 겪었다).
+
+| 값 | 소유자 |
+|---|---|
+| `densityMultiplier`, `numPrimarySteps`, 안개 `_MaxDistance` | `TuneAtmosphere.cs` |
+| `globalSpeed`, `shapeSpeed`, `erosionSpeed`, 드리프트 | `SetupCloudHandle.cs` |
+| 바람 방위 | `SyncWind.cs` |
+| 피처 부착·최초 생성 | `SetupVolumetrics.cs` |
+
+`CLOUD_Layer` 씬 오브젝트는 `[ExecuteAlways]` 라 **씬을 여는 것만으로
+자기 값을 프로파일에 쓴다.** 프로파일만 고치면 다음에 씬을 열 때
+되돌아가므로, 반드시 `Tools/Yeouido 63/구름 레이어 오브젝트 만들기` 를
+돌려 컴포넌트까지 같이 맞춰야 한다.
 
 > **예외 1건 — 로컬 패치가 들어가 있다.**
 > `VolumetricClouds.shader` 의 깊이 샘플링을 한 곳 고쳤다. 설정으로는
@@ -33,7 +48,7 @@ HDRP 의 볼류메트릭 구름을 URP 로 포팅한 것. 레포는 URP 14 기�
 
 - `PC_Renderer` 에 `VolumetricCloudsURP` 렌더러 피처
 - `Yeouido63_Post.asset` 에 `Sky/Volumetric Clouds (URP)` 오버라이드
-- `state = Enabled`, `densityMultiplier = 0.06`, `globalSpeed = 0.04`
+- `state = Enabled`, `densityMultiplier = 0.06`, `globalSpeed = 0.02`
 - `bottomAltitude = 250`, `altitudeRange = 120`, `numPrimarySteps = 48`
 
 밀도는 기본값(0.4)에서 계속 내려왔다. 0.22 -> 0.14 -> 0.06 이다.
@@ -86,9 +101,14 @@ HDRP 의 볼류메트릭 구름을 URP 로 포팅한 것. 레포는 URP 14 기�
 그 픽셀은 가려진 것으로 친다. 보수적으로 가리는 쪽이라 구름이 새지 않는다.
 역방향 Z 에서는 값이 클수록 가까우므로 `max` 가 최근접이다.
 
-텍셀 크기는 `_CameraDepthTexture.GetDimensions` 로 직접 구한다.
-`_ScreenParams` 는 지금 그리는 대상(절반 해상도) 기준이라 쓰면 안 되고,
-`_CameraDepthTexture_TexelSize` 는 이 패스에서 선언되지 않는다.
+텍셀 크기는 `_CameraDepthTexture_TexelSize.xy` 를 쓴다.
+`_ScreenParams` 는 지금 그리는 대상(절반 해상도) 기준이라 쓰면 안 된다.
+
+처음엔 `GetDimensions` 로 직접 물어봤는데 두 가지가 틀렸다. `_TexelSize`
+가 없다고 본 게 사실과 달랐고(`DeclareDepthTexture.hlsl` 이 텍스처 바로
+다음 줄에서 선언한다), `_CameraDepthTexture` 는 `TEXTURE2D_X` 라 대부분의
+API 에서 `Texture2DArray` 로 펼쳐져 2 인자 `GetDimensions` 오버로드가
+아예 없다. 상수 버퍼 읽기라 비용도 이쪽이 싸다.
 
 ### 비용
 

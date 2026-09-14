@@ -172,7 +172,9 @@ public static class SyncWind
 
         foreach (var comp in post.components)
         {
-            if (comp.GetType().Name != "VolumetricClouds") continue;
+            // null 가드가 필요하다. 스크립트가 사라진 오버라이드가 남아
+            // 있으면 components 에 null 엔트리가 들어온다.
+            if (comp == null || comp.GetType().Name != "VolumetricClouds") continue;
 
             var so = new SerializedObject(comp);
 

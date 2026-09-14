@@ -46,8 +46,11 @@ public static class VerifyGrass
         var roof = roofGo.GetComponent<MeshRenderer>().bounds;
         Debug.Log($"[검증] 옥상 월드바운즈 center={roof.center} size={roof.size} 윗면Y={roof.max.y:F2}");
 
-        Check("GRASS_Helipad",       all, roof);
-        Check("GRASS_HelipadCenter", all, roof);
+        // GRASS_HelipadCenter 도 같이 봤었는데 지웠다. 그 오브젝트를
+        // 만드는 스크립트가 이미 폐기돼서(위 주석 참고) 검증할 때마다
+        // "없음" 경고만 나왔다. 안 나는 게 정상인 경고가 쌓이면 진짜
+        // 경고가 묻힌다.
+        Check("GRASS_Helipad", all, roof);
     }
 
     static void Check(string name, GameObject[] all, Bounds roof)

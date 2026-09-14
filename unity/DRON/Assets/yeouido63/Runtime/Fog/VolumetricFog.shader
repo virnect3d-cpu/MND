@@ -10,15 +10,19 @@
 //      주거나 _MaxDistance 를 크게 주면 루프가 수만 번 돈다.
 //      주의: MAX_STEPS 는 실제로 걸리는 상한이 아니다. 154행의
 //      max(_StepSize, distLimit/MAX_STEPS) 가 스텝 크기의 하한을 잡아 주므로
-//      반복 수를 실제로 정하는 건 _StepSize 다. 지금 값(22, 거리 1200)에서
-//      반복은 55 회고 128 에는 닿지 않는다. 128 은 _StepSize 를 아주 작게
+//      반복 수를 실제로 정하는 건 _StepSize 다. 지금 값(22, 거리 900)에서
+//      반복은 41 회고 128 에는 닿지 않는다. 128 은 _StepSize 를 아주 작게
 //      줬을 때만 의미가 있는 안전장치다.
 //   2) 스텝 수를 거리에 맞춰 정규화했다. 상한에 걸리면 스텝을 늘려서
 //      "가까운 데만 포그가 끼는" 현상 대신 전체가 옅어지게 한다.
 //   3) 하늘(depth == 0/1) 픽셀에서 worldPos 가 무한대로 튀는 걸 막았다.
 //      원본은 SampleSceneDepth 결과를 그대로 쓰는데, 스카이박스 픽셀에서
 //      viewLength 가 폭발해 포그가 화면을 덮는다.
-//   4) 노이즈 3D 텍스처가 없을 때를 대비해 절차적 폴백을 넣었다.
+//   4) 스테레오 매크로를 맞췄다 (_BlitTexture 는 TEXTURE2D_X 다).
+//
+//   주의: 노이즈 3D 텍스처는 폴백이 없다. 비면 Unity 기본 "white" 가
+//   물려 밀도가 상수가 되고 화면이 단색으로 덮인다. _FogNoise 가
+//   비어 있지 않은지 머티리얼에서 확인해라.
 //
 // 씬 맥락
 //   이 주석은 원래 항공 시점(카메라 고도 280m, far clip 30000) 기준으로
@@ -37,7 +41,7 @@ Shader "Yeouido63/VolumetricFog"
     Properties
     {
         _Color              ("Color", Color) = (1, 1, 1, 1)
-        _MaxDistance        ("Max distance", float) = 2500
+        _MaxDistance        ("Max distance", float) = 900
         _StepSize           ("Step size", Range(0.1, 200)) = 12
         _DensityMultiplier  ("Density multiplier", Range(0, 10)) = 1
         _NoiseOffset        ("Noise offset", float) = 1
@@ -70,7 +74,18 @@ Shader "Yeouido63/VolumetricFog"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment frag
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            // _MAIN_LIGHT_SHADOWS_SCREEN 은 뺐다.
+            //
+            //   그 배리언트에서는 TransformWorldToShadowCoord 가 섀도맵
+            //   좌표가 아니라 화면 좌표를 돌려주고, 그림자를 스크린스페이스
+            //   버퍼에서 읽는다. 그 버퍼는 불투명 표면 깊이 기준으로 만든
+            //   것이라, 레이마칭 중간 지점을 넣으면 그 지점이 아니라
+            //   "그 픽셀의 표면" 그림자가 나온다. 안개 전 구간이 같은 값을
+            //   받아 볼류메트릭 그림자가 통째로 뭉개진다.
+            //
+            //   에러가 안 나고 그림만 틀리는 종류라 제일 늦게 발견된다.
+            //   빼면 URP 가 일반 섀도맵 경로로 폴백한다.
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -148,7 +163,13 @@ Shader "Yeouido63/VolumetricFog"
 
             half4 frag(Varyings IN) : SV_Target
             {
-                float4 col = SAMPLE_TEXTURE2D(_BlitTexture, sampler_LinearClamp, IN.texcoord);
+                // _X 매크로로 읽어야 한다. Blit.hlsl 이 _BlitTexture 를
+                // TEXTURE2D_X 로 선언하는데, 대부분의 그래픽스 API 에서
+                // 그건 Texture2DArray 로 펼쳐진다. 비-X 매크로로 읽으면
+                // 단일 뷰에서는 배열 인덱스가 0 으로 접혀 우연히 돌지만
+                // 스테레오에서는 깨진다. 눈 인덱스도 같이 세워 준다.
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+                float4 col = SAMPLE_TEXTURE2D_X(_BlitTexture, sampler_LinearClamp, IN.texcoord);
 
                 float depth = SampleSceneDepth(IN.texcoord);
 

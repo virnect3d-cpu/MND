@@ -31,7 +31,11 @@ using UnityEngine.Rendering;
 public static class SetupReflectionProbe
 {
     const string ProbeName = "ReflectionProbe_RoofTop";
-    const string Flag = "Temp/yeouido63_probe.flag";
+    // RunFixAndCapture 의 구름 측정 플래그와 이름이 겹쳐 있었다
+    // ("probe" 가 ReflectionProbe 와 ProbeClouds 양쪽을 뜻해서다).
+    // 같은 파일을 두 훅이 보는 바람에, 구름 측정 하나 하려고 플래그를
+    // 놓으면 라이트맵 베이크가 같이 시작될 수 있었다. 이름을 갈랐다.
+    const string Flag = "Temp/yeouido63_refprobe.flag";
 
     [DidReloadScripts]
     static void OnReload()

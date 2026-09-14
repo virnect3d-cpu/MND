@@ -39,7 +39,25 @@ public static class SceneSaver
         return true;
     }
 
+    /// <summary>경로를 지정해 씬을 저장한다. 새 씬을 처음 디스크에 쓸 때 쓴다.</summary>
+    public static bool Save(Scene scene, string path, string who)
+    {
+        if (EditorApplication.isPlaying || EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            Debug.LogWarning($"[{who}] 플레이 중이라 씬을 저장 못 했다: {path}");
+            return false;
+        }
+
+        if (!scene.IsValid())
+        {
+            Debug.LogError($"[{who}] 저장할 씬이 유효하지 않다.");
+            return false;
+        }
+
+        EditorSceneManager.SaveScene(scene, path);
+        return true;
+    }
+
     /// <summary>현재 활성 씬을 저장한다.</summary>
     public static bool Save(string who) => Save(EditorSceneManager.GetActiveScene(), who);
 }
-// touch 1789343259

@@ -129,8 +129,12 @@ public static class SetupVolumetrics
         mat.shader = sh;
         var noise = AssetDatabase.LoadAssetAtPath<Texture3D>(NoisePath);
         if (noise != null) mat.SetTexture("_FogNoise", noise);
-        // 항공 시점 기준값. 씬 포그(4200m)와 겹치지 않게 짧게 잡았다.
-        mat.SetFloat("_MaxDistance", 2500f);
+        // 사거리는 TuneAtmosphere 소유다. 여기선 그 값으로 초기화만 한다.
+        //
+        //   예전엔 2500 을 박아 뒀다. "씬 포그(4200m)와 겹치지 않게" 라는
+        //   근거였는데 씬 포그는 SetupYeouido63 에서 꺼져 있고(fog=false),
+        //   카메라 far clip 은 1000 이라 2500 은 1500m 를 헛도는 값이었다.
+        mat.SetFloat("_MaxDistance", TuneAtmosphere.FogMaxDistance);
         mat.SetFloat("_StepSize", 12f);
         mat.SetFloat("_DensityMultiplier", 0.6f);
         mat.SetFloat("_DensityThreshold", 0.35f);
@@ -250,16 +254,23 @@ public static class SetupVolumetrics
         else log.Add("구름: 볼륨 오버라이드 이미 있음");
 
         // state 를 켜야 실제로 그려진다 (Setup.md 3단계)
+        //
+        //   짙기와 속도는 여기서 숫자를 박지 않는다. 이 스크립트는 최초
+        //   생성용이라 한 번만 돌지만, 다시 돌리면 튜닝을 되돌린다.
+        //   예전에 여기 density 0.22 / speed 2.5 가 박혀 있었는데 실제
+        //   운용값은 0.06 / 0.02 라 100 배 넘게 어긋나 있었다.
+        //
+        //   짙기 = TuneAtmosphere, 속도 = SetupCloudHandle 소유다.
+        //   여기서는 소유자의 상수를 그대로 참조해 초기값만 맞춘다.
         var so = new SerializedObject(comp);
         SetBool(so, "state", true);
-        // 항공 시점이라 기본 밀도면 화면을 덮는다. 옅게.
-        SetFloat(so, "densityMultiplier", 0.22f);
+        SetFloat(so, "densityMultiplier", TuneAtmosphere.CloudDensity);
         SetBool(so, "localClouds", false);          // 지평선까지 도는 원거리 구름
-        SetFloat(so, "globalSpeed", 2.5f);          // 아주 느리게 흐르도록
         so.ApplyModifiedPropertiesWithoutUndo();
         EditorUtility.SetDirty(comp);
         EditorUtility.SetDirty(profile);
-        log.Add("구름: state=Enabled, density=0.22, speed=2.5");
+        log.Add($"구름: state=Enabled, density={TuneAtmosphere.CloudDensity:F2} " +
+                "(속도는 구름 레이어 셋업이 정한다)");
     }
 
     static void SetBool(SerializedObject so, string name, bool v)

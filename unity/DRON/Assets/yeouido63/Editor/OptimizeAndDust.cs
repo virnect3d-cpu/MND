@@ -119,20 +119,17 @@ public static class OptimizeAndDust
             EditorUtility.SetDirty(o);
         }
 
-        // --- 구름 레이마칭 스텝
-        var post = AssetDatabase.LoadAssetAtPath<VolumeProfile>(PostPath);
-        if (post != null)
-        {
-            foreach (var comp in post.components)
-            {
-                if (comp == null || comp.GetType().Name != "VolumetricClouds") continue;
-                var so = new SerializedObject(comp);
-                SetParam(so, "numPrimarySteps", 24, "구름 1차 스텝");
-                so.ApplyModifiedProperties();
-                EditorUtility.SetDirty(comp);
-            }
-            EditorUtility.SetDirty(post);
-        }
+        // --- 구름 레이마칭 스텝은 여기서 안 건드린다 (TuneAtmosphere 소유)
+        //
+        //   예전엔 여기서 numPrimarySteps 를 24 로 내렸다. "최적화" 니까
+        //   스텝을 깎는 게 맞다고 본 것인데, 나중에 24 가 구름 가장자리를
+        //   스프레이처럼 부수는 원인으로 밝혀져 48 로 올렸다.
+        //
+        //   그대로 두면 이 메뉴를 누를 때마다 그 수정이 되돌아간다.
+        //   이름은 최적화인데 실제로는 화질을 회귀시키는 셈이라 제일
+        //   찾기 어려운 종류의 사고다. 그래서 블록을 지웠다.
+        //
+        //   스텝 수를 조정할 일이 있으면 TuneAtmosphere.CloudSteps 를 고쳐라.
     }
 
     // VolumeParameter 는 { m_OverrideState, m_Value } 구조다.
@@ -203,14 +200,13 @@ public static class OptimizeAndDust
         //
         //   레이마칭 비용 = 픽셀 수 x 스텝 수이고, 스텝 수는 대략
         //   _MaxDistance / _StepSize 다. 2600/18 = 144 스텝은 전체 화면에
-        //   깔기엔 무겁다.
+        //   깔기엔 무겁다. 그래서 스텝을 22m 로 키웠다.
         //
-        //   1200m 로 줄인다. 이 거리면 63빌딩 주변 블록까지는 황사가 덮이고
-        //   그 너머는 Linear 안개(더 싸다)가 이어받는다. 두 안개의 색을
-        //   맞춰 놨으므로 경계가 눈에 띄지 않는다.
-        //   스텝은 22m 로 키워 스텝 수를 144 -> 55 로 떨어뜨린다. 밀도가
-        //   낮아서(소광계수 0.0008/m) 이 정도 간격에선 밴딩이 안 보인다.
-        if (mat.HasProperty("_MaxDistance"))       mat.SetFloat("_MaxDistance", 1200f);
+        //   _MaxDistance 는 여기서 안 건드린다 (TuneAtmosphere 소유).
+        //   예전엔 여기서 1200 을 썼는데, 카메라 far clip 이 1000 이라
+        //   200m 가 순수 낭비였다. TuneAtmosphere 가 900 으로 내렸고
+        //   여기 1200 을 남겨 두면 이 메뉴가 그걸 되돌린다.
+        //   현재 900/22 = 41 스텝이다.
         if (mat.HasProperty("_StepSize"))          mat.SetFloat("_StepSize", 22f);
 
         // 농도.

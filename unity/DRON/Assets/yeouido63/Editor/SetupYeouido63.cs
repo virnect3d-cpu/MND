@@ -239,7 +239,9 @@ public static class SetupYeouido63
             sv.Repaint();
         }
 
-        EditorSceneManager.SaveScene(scene, ScenePath);
+        // SceneSaver 를 거친다. 여기가 씬을 통째로 덮어쓰는 자리라
+        // 플레이 중이면 예외로 터지는 게 제일 손해가 크다.
+        SceneSaver.Save(scene, ScenePath, "Yeouido63");
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 

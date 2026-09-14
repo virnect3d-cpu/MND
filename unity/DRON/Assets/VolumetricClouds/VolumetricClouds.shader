@@ -137,14 +137,21 @@ Shader "Hidden/Sky/VolumetricClouds"
                 //   보수적으로 가리는 쪽이라 구름이 새지 않는다.
                 //   역방향 Z 에서는 깊이값이 클수록 가까우므로 max 가 최근접이다.
                 {
-                    // 텍셀 크기는 깊이 텍스처에 직접 물어본다.
+                    // 텍셀 크기는 깊이 텍스처 기준으로 잡는다.
                     //   _ScreenParams 는 지금 그리는 대상(절반 해상도) 기준이라
                     //   그대로 쓰면 텍셀이 두 배가 되어 엉뚱한 데를 읽는다.
-                    //   _CameraDepthTexture_TexelSize 는 이 패스에서 선언되지
-                    //   않는다. GetDimensions 가 유일하게 확실한 방법이다.
-                    float dw, dh;
-                    _CameraDepthTexture.GetDimensions(dw, dh);
-                    float2 texel = float2(1.0 / dw, 1.0 / dh);
+                    //
+                    //   _CameraDepthTexture_TexelSize 를 쓴다. 이건
+                    //   DeclareDepthTexture.hlsl 이 텍스처 바로 다음 줄에서
+                    //   선언하고, 이 패스도 그 파일을 타고 들어온다
+                    //   (VolumetricClouds.hlsl -> VolumetricCloudsUtilities.hlsl).
+                    //
+                    //   처음엔 GetDimensions 로 직접 물어봤는데 두 가지가 틀렸다.
+                    //   _TexelSize 가 없다고 본 것이 사실과 달랐고,
+                    //   _CameraDepthTexture 는 TEXTURE2D_X 라 대부분의 API 에서
+                    //   Texture2DArray 로 펼쳐져 2 인자 GetDimensions 오버로드가
+                    //   아예 없다. 상수 버퍼 읽기라 비용도 이쪽이 싸다.
+                    float2 texel = _CameraDepthTexture_TexelSize.xy;
                     float d0 = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV + float2(-0.5, -0.5) * texel, 0).r;
                     float d1 = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV + float2( 0.5, -0.5) * texel, 0).r;
                     float d2 = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV + float2(-0.5,  0.5) * texel, 0).r;

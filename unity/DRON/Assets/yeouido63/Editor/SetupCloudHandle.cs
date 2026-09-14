@@ -26,10 +26,14 @@ public static class SetupCloudHandle
     //   반대였다 — shapeOffset 은 카메라 거리와 무관하게 무늬를 미는 값이라
     //   원근 감쇠가 없다. 12 면 하늘 전체가 눈에 띄게 쓸려 간다.
     //
-    //   2.5 -> 0.8 -> 0.4 -> 0.15 -> 0.05. 10 분에 30 m 다.
-    //   절반씩 내리는 걸 세 번 했는데 매번 "아직 빠르다" 가 나와서
-    //   이번엔 1/3 로 간다.
-    const float DriftSpeed  = 0.05f;
+    //   2.5 -> 0.8 -> 0.4 -> 0.15 -> 0.05 -> 0.025. 10 분에 15 m 다.
+    //
+    //   정밀도는 걱정 안 해도 된다. float 은 이 크기에서 소수점 7 자리까지
+    //   정확해서 0.025 는 한참 여유가 있다. 오히려 half 같은 더 작은
+    //   타입으로 내리면 정밀도가 떨어져서 반대가 된다.
+    //   누적도 안전하다 — _drift 에 매 프레임 더하는 구조지만 float 이
+    //   1 근처에서도 1e-7 을 구분하므로 60fps 로 몇 시간을 돌려도 된다.
+    const float DriftSpeed  = 0.025f;
 
     // 제자리에서 굴러가는 속도(배율).
     //
@@ -37,16 +41,31 @@ public static class SetupCloudHandle
     //   구름이 여전히 빨라 보였다. globalSpeed 는 아래 두 배율을 곱하는데
     //   둘 다 1.0(상한)으로 올려 둔 상태라 실효 속도가 그대로였다.
     //
-    //   globalSpeed 7.5 -> 2.5 -> 0.6 -> 0.3 -> 0.12 -> 0.04 로 내려왔다.
-    //   셋이 곱해지므로 하나만 만지면 체감이 잘 안 바뀐다.
+    //   globalSpeed 7.5 -> 2.5 -> 0.6 -> 0.3 -> 0.12 -> 0.04 -> 0.02 로
+    //   내려왔다. 셋이 곱해지므로 하나만 만지면 체감이 잘 안 바뀐다.
     //
     //   줄일 때는 globalSpeed 만 건드린다. 곱이라 실효가 비례해서 줄고,
     //   형상과 침식의 비율(0.35:0.25)이 유지돼 구름 결이 안 변한다.
-    //     형상 실효 0.042 -> 0.014
-    //     침식 실효 0.030 -> 0.010
-    const float GlobalSpeed   = 0.04f;
+    //     형상 실효 0.014 -> 0.007
+    //     침식 실효 0.010 -> 0.005
+    const float GlobalSpeed   = 0.02f;
     const float ShapeSpeed    = 0.35f;   // 형상이 뭉개지는 속도
     const float ErosionSpeed  = 0.25f;   // 가장자리가 헐리는 속도
+
+    // 짙기는 TuneAtmosphere 가 정한 값을 그대로 받아 쓴다.
+    //
+    //   여기서 안 쓰면 되돌림 사고가 난다. 실제로 겪었다 —
+    //   대기 튜닝으로 프로파일을 0.06 으로 내렸는데 다음에 씬을 열자
+    //   0.14 로 돌아와 있었다.
+    //
+    //   범인은 씬에 구워진 CloudLayerHandle.density 였다. 이 컴포넌트는
+    //   [ExecuteAlways] 라 씬을 여는 것만으로 OnEnable -> Apply() 가 돌고,
+    //   Apply() 는 자기 필드를 프로파일에 쓴다. 즉 씬 컴포넌트가 항상
+    //   마지막 발언권을 가진다. 프로파일만 고치는 건 의미가 없다.
+    //
+    //   그래서 셋업이 컴포넌트까지 같이 맞춘다. 속도 3 개는 원래 그렇게
+    //   하고 있었는데 짙기만 빠져 있었던 게 사고의 원인이다.
+    //   값 자체는 TuneAtmosphere 소유라 여기에 숫자를 박지 않는다.
 
     [DidReloadScripts]
     static void OnReload()
@@ -116,6 +135,11 @@ public static class SetupCloudHandle
         h.shapeSpeed   = ShapeSpeed;
         h.erosionSpeed = ErosionSpeed;
 
+        // 짙기는 Pull() 이 프로파일에서 읽어 온 값을 덮어쓴다.
+        // 안 덮으면 씬에 구워진 옛 값이 살아남아 프로파일을 되돌린다.
+        float beforeDensity = h.density;
+        h.density = TuneAtmosphere.CloudDensity;
+
         h.Apply();
 
         EditorUtility.SetDirty(h);
@@ -129,7 +153,8 @@ public static class SetupCloudHandle
         var p = go.transform.position;
         Debug.Log($"[구름] '{ObjName}' 준비됐다. " +
                   $"고도 {p.y:F0}~{p.y + h.thickness:F0} m, " +
-                  $"기준 오프셋 ({p.x:F0},{p.z:F0}), 짙기 {h.density:F2}. " +
+                  $"기준 오프셋 ({p.x:F0},{p.z:F0}), " +
+                  $"짙기 {beforeDensity:F2} -> {h.density:F2}. " +
                   $"드리프트 {h.driftSpeed:F3} m/s -> " +
                   $"({h.driftDirection.x:F0},{h.driftDirection.y:F0}). " +
                   $"굴러가기 {h.speed:F2} x 형상 {h.shapeSpeed:F2}/침식 {h.erosionSpeed:F2} " +

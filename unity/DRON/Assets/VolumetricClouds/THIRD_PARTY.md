@@ -178,3 +178,110 @@ C# 쪽 대입 코드는 영향이 없다. 레지스터 정밀도만 올라간다
 구름 셰이더와 무관하다. `FixShimmerDithering.cs` 주석에 측정표가 있다.
 시간누적(`temporalAccumulationFactor`)은 두 증상 모두와 무관하다 — 0/0.5/1 을
 다 시험했고 전부 같았다.
+
+---
+
+## 로컬 패치 3 — 레이 시작점 지터 복구 + 샘플 분포 개선
+
+패치 2 로 덜컥거림이 줄긴 했지만 남아 있었다. 원인이 정밀도 하나가 아니라
+**레이마칭 표본 분포**에도 있었다.
+
+### 3-1. 지터가 사실상 안 걸려 있었다 (본체)
+
+**파일**: `VolumetricClouds.hlsl`, `TraceVolumetricRay`
+
+```hlsl
+HDRP 원본 : float currentDistance = cloudRay.integrationNoise * stepS;
+이 패키지 : float currentDistance = cloudRay.integrationNoise;      // * stepS 누락
+```
+
+`integrationNoise` 는 0~1 이다. 그걸 거리(미터)에 그대로 넣으면 지터 폭이
+최대 1m 인데, 이 씬의 실제 `stepS` 는 **41.67m** 다.
+
+| | 지터 폭 | stepS 대비 |
+|---|---|---|
+| 수정 전 | 1.00 m | 2.4% |
+| 수정 후 | 41.67 m | 100% |
+
+시작점이 안 흩어지면 모든 픽셀이 같은 평면에서 밀도를 뜬다. 계단과 띠가
+남는 직접 원인이다. URP 포팅 과정의 누락이다.
+
+### 3-2. 노이즈가 프레임마다 안 바뀌었다
+
+**파일**: `VolumetricCloudsUtilities.hlsl`, `GenerateRandomFloat`
+
+```hlsl
+float time = unity_DeltaTime.y * _Time.y + _Seed;
+_Seed += 1.0;   // 효과 없음
+```
+
+- `_Seed` 는 CBUFFER 상수(uniform)다. 셰이더에서 `+=` 로 쓴 값은 밖으로
+  나가지 않는다. 컴파일러가 로컬 복사본만 고치고 버린다.
+- `unity_DeltaTime.y` 는 `1/dt` 다. 프레임률이 안정되면 이 곱이 매 프레임
+  거의 같은 값이라 **같은 노이즈 패턴이 반복**된다.
+
+고정 패턴 + 재투영 누적이 만나면 같은 오차가 계속 쌓인다.
+**플레이 모드에서 더 도드라지던 이유**다 — 씬뷰는 히스토리 누적이 약하다.
+
+### 3-3. 화이트노이즈 -> R2 저불일치 수열
+
+`GenerateHashedRandomFloat` 은 Jenkins 해시, 즉 **화이트노이즈**다.
+(업스트림 주석은 "blue noise" 라고 써 있지만 사실이 아니다.)
+
+화이트노이즈는 이웃 픽셀 값이 독립이라 우연히 뭉친 구역이 저주파 얼룩으로
+보인다. R2 수열은 "이미 찍은 점에서 최대한 먼 곳"을 차례로 고르는 수열이라
+같은 샘플 수로 훨씬 고르게 덮인다. 공간 분포와 프레임 간 회전을 한 식에서
+같이 처리한다.
+
+측정 (수치 시뮬레이션):
+
+| 항목 | white | R2 | 개선 |
+|---|---|---|---|
+| 공간 균일성 (타일 평균의 표준편차) | 0.0335 | **0.0108** | 3.1 배 |
+| 시간 수렴 8 프레임 | 0.0820 | **0.0330** | 2.5 배 |
+| 시간 수렴 32 프레임 | 0.0408 | **0.0108** | 3.8 배 |
+
+누적 프레임이 쌓일수록 격차가 벌어진다. 이 씬은
+`_AccumulationFactor = 0.95` 로 길게 누적하므로 그 성질이 그대로 이득이다.
+
+**비용은 오히려 준다.** 곱셈 2 + 덧셈 2 + `frac` 1 로, Jenkins 해시(시프트·
+XOR·곱셈 9 회 남짓)보다 싸다. 블루노이즈 텍스처 방식과 달리 텍스처 샘플이
+0 이라 대역폭도 안 먹는다.
+
+### 3-4. `relativeStepSize` 제거
+
+```hlsl
+float relativeStepSize = lerp(cloudRay.integrationNoise, 1.0, saturate(currentIndex));
+```
+
+두 가지로 잘못돼 있었다.
+
+1. **지터가 아니다.** `currentIndex` 가 `int` 라 `saturate()` 가 0 아니면 1 로만
+   떨어진다. 첫 스텝만 `noise` 배(0~1)이고 2 번째부터 전부 1.0 이다.
+   스텝을 흩는 게 아니라 첫 칸만 좁히는 동작이었다.
+2. **같은 난수를 두 번 먹는다.** 3-1 로 시작점을 `noise * stepS` 만큼 이미
+   밀어놨는데 첫 스텝 폭까지 같은 `noise` 로 좁히면 표본이 겹쳐 지터 효과를
+   깎는다.
+
+HDRP 원본도 여기서 `stepS` 로 균일하게 전진한다
+(`VolumetricCloudsUtilities.hlsl:578`). 이 줄은 URP 포팅판이 끼워넣은
+것이고, 빼는 쪽이 원본과 일치하며 곱셈 2 회도 줄어든다.
+
+### 3-5. `_NumPrimarySteps`, `_MaxStepSize` half -> float
+
+`stepS` 를 정하는 두 값이다. `stepS` 는 표본 간격이자 지터 폭이므로
+정밀도가 곧 품질이다.
+
+다만 정직하게 — `_MaxStepSize`(250)는 현재 설정에서 `min()` 에 안 뽑힌다
+(41.67 < 250). 실재 오차는 `_NumPrimarySteps` 쪽 0.0104m 뿐이다.
+비용이 0 이고 고도·스텝 설정을 바꾸면 즉시 물리는 자리라 올려 뒀다.
+
+`Defs.hlsl` 의 나머지 `half` 27 개는 전수 점검했고 **그대로 둔다.**
+0~1 계수(`_ShapeFactor` 등), 색(`_ScatteringTint`), SH 계수(`clouds_SH*`)라
+half 정밀도로 충분하고, 올리면 레지스터만 낭비다.
+`_NormalizationFactor` / `_CloudNearPlane` 2 개는 현재 미사용이라 손 안 댔다.
+
+### 검증 방법
+
+`Tools/Yeouido 63/구름 떨림 측정` (`ProbeShimmer.cs`).
+패치 2 시점 기록은 시간누적 0.5 에서 0.76 이었다.

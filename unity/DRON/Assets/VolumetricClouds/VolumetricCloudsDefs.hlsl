@@ -3,9 +3,23 @@
 
 CBUFFER_START(UnityPerMaterial)
 float _Seed;
-half _NumPrimarySteps;
+// [여의도63 수정] half -> float. 이 둘이 레이마칭 스텝 간격을 정한다.
+//
+//   VolumetricClouds.hlsl:61 에서
+//       float stepS = min(totalDistance / _NumPrimarySteps, _MaxStepSize);
+//   로 stepS 가 나오고, 이게 표본 간격이자 시작점 지터의 폭이다.
+//
+//   _MaxStepSize 는 보통 수백~수천 단위라 half 의 표현 간격이 벌어지는
+//   구간에 들어간다. 거기서 값이 계단으로 떨어지면 스텝 간격이 프레임마다
+//   튀고, 밀도 표본 위치가 통째로 흔들려 구름이 덜컥거린다.
+//   위치 누적값을 float 로 올린 것(패치 2)과 같은 병이다.
+//
+//   _NumPrimarySteps 는 나눗셈의 분모라 같이 올린다. 48 정도는 half 로도
+//   정확하지만, stepS 를 float 로 계산시키려면 분모도 float 여야 중간에서
+//   정밀도가 깎이지 않는다.
+float _NumPrimarySteps;
 half _NumLightSteps;
-half _MaxStepSize;
+float _MaxStepSize;
 float _HighestCloudAltitude;
 float _LowestCloudAltitude;
 // [여의도63 수정] half -> float. 구름 흐름 오프셋이다.

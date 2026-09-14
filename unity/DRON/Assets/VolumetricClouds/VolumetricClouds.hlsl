@@ -72,7 +72,17 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
             float meanDistanceDivider = 0.0;
 
             // Current position for the evaluation, apply blue noise to start position
-            float currentDistance = cloudRay.integrationNoise;
+            // [여의도63 수정] `* stepS` 가 빠져 있었다 — URP 포팅 과정의 누락이다.
+            //
+            //   integrationNoise 는 0~1 범위다. 그걸 거리(미터)에 그대로 넣으면
+            //   지터 폭이 최대 1m 인데, 이 씬의 stepS 는 수~수십 m 다. 즉 시작점
+            //   흔들기가 스텝 간격의 1/10 도 안 돼서 사실상 안 걸린 것과 같았다.
+            //   레이마칭 시작점이 픽셀마다 안 흩어지면 밀도 표본이 같은 평면에
+            //   몰려서 계단/띠가 남는다.
+            //
+            //   HDRP 원본(VolumetricCloudsUtilities.hlsl:522)은 `* stepS` 가 있다.
+            //   스텝 크기에 비례해야 "한 스텝 안에서 고르게 흩어진다" 가 성립한다.
+            float currentDistance = cloudRay.integrationNoise * stepS;
             float3 currentPositionWS = cloudRay.originWS + (rayMarchRange.start + currentDistance) * cloudRay.direction;
 
             // Initialize the values for the optimized ray marching
@@ -128,9 +138,26 @@ VolumetricRayResult TraceVolumetricRay(CloudRay cloudRay)
                         activeSampling = false;
 
                     // Do the next step
-                    float relativeStepSize = lerp(cloudRay.integrationNoise, 1.0, saturate(currentIndex));
-                    currentPositionWS += cloudRay.direction * stepS * relativeStepSize;
-                    currentDistance += stepS * relativeStepSize;
+                    //
+                    // [여의도63 수정] relativeStepSize 를 걷어냈다. 원래 코드:
+                    //     float relativeStepSize = lerp(integrationNoise, 1.0, saturate(currentIndex));
+                    //     currentPositionWS += direction * stepS * relativeStepSize;
+                    //
+                    //   1) 지터가 아니었다. currentIndex 는 int 라 saturate() 가
+                    //      0 아니면 1 로만 떨어진다. 즉 첫 스텝만 noise 배(0~1)
+                    //      이고 2 번째부터는 전부 1.0 이다. 스텝을 흩는 게 아니라
+                    //      그냥 첫 칸만 좁히는 동작이었다.
+                    //
+                    //   2) 이제는 같은 난수를 두 번 먹는다. 위에서 시작점을
+                    //      noise * stepS 만큼 이미 밀어놨는데(지터 본체), 여기서
+                    //      첫 스텝 폭까지 같은 noise 로 좁히면 시작점이 밀린 만큼
+                    //      첫 구간이 또 줄어 표본이 겹친다. 지터 효과를 깎는다.
+                    //
+                    //   HDRP 원본도 여기서 stepS 로 균일하게 전진한다
+                    //   (VolumetricCloudsUtilities.hlsl:578). 이 줄은 URP 포팅판이
+                    //   끼워넣은 것이고, 빼는 쪽이 원본과 일치하고 더 싸다.
+                    currentPositionWS += cloudRay.direction * stepS;
+                    currentDistance += stepS;
 
                 }
                 else

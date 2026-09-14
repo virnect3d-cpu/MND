@@ -130,11 +130,69 @@ float ConvertCloudDepth(float3 position)
     return hClip.z / hClip.w;
 }
 
+// [여의도63 수정] 레이 시작점 지터를 화이트노이즈 -> R2 저불일치 수열로.
+//
+// ── 원래 코드의 문제 2 가지 ──────────────────────────────────────────
+//
+//       float time = unity_DeltaTime.y * _Time.y + _Seed;
+//       _Seed += 1.0;
+//       return GenerateHashedRandomFloat(uint3(screenUV * _ScreenSize.xy, time));
+//
+//   1) `_Seed += 1.0` 은 아무 효과가 없다. _Seed 는 CBUFFER 상수(uniform)라
+//      셰이더에서 쓴 값이 밖으로 나가지 않는다. 컴파일러가 로컬 복사본만
+//      고치고 버린다. 픽셀 사이에도, 프레임 사이에도 전달되지 않는다.
+//
+//   2) `unity_DeltaTime.y` 는 1/dt 다. 프레임률이 안정되면 dt 가 거의 같아서
+//      이 곱이 매 프레임 비슷한 값으로 떨어진다. 해시 입력이 거의 안 변해
+//      같은 패턴이 반복되고, 재투영이 같은 오차를 계속 누적한다.
+//      플레이 모드에서 덜컥거림이 더 도드라지던 직접 원인이다.
+//
+// ── 왜 해시를 버렸나 ────────────────────────────────────────────────
+//
+//   GenerateHashedRandomFloat 은 Jenkins 해시다. 즉 화이트노이즈다.
+//   (원본 주석은 "blue noise" 라고 써 있지만 사실이 아니다.)
+//
+//   화이트노이즈는 이웃 픽셀의 값이 서로 독립이다. 그래서 우연히 비슷한
+//   값이 뭉친 구역과 흩어진 구역이 생기고, 그 편차가 저주파 얼룩으로
+//   보인다. 샘플 수를 늘리는 것 말고는 개선 수단이 없다.
+//
+//   R2 저불일치 수열은 반대로 "이미 찍은 점에서 최대한 먼 곳"을 차례로
+//   고르도록 설계된 수열이다. 같은 샘플 수로 훨씬 고르게 덮이므로,
+//   스텝 수를 안 늘리고도 표본 분포가 매끄러워진다.
+//   http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+//
+// ── 비용 ────────────────────────────────────────────────────────────
+//
+//   곱셈 2 + 덧셈 2 + frac 1 이다. Jenkins 해시(시프트·XOR·곱셈 9 회
+//   남짓)보다 오히려 싸다. 블루노이즈 텍스처를 쓰는 흔한 대안과 달리
+//   텍스처 샘플이 0 이라 대역폭도 안 먹는다.
+//
+// ── 공간과 시간을 한 식에서 같이 처리한다 ───────────────────────────
+//
+//   공간: 픽셀 좌표에 R2 의 두 계수를 곱해 화면 전체에 고르게 흩는다.
+//   시간: 같은 식에 프레임 인덱스 * 황금비를 더해 수열을 통째로 회전시킨다.
+//         연속한 프레임이 서로의 빈틈을 메우는 자리에 떨어지므로,
+//         재투영으로 시간 평균이 쌓일 때 고르게 수렴한다.
+//         프레임마다 완전 무작위로 점프하면(직전 _Time.y 방식) 누적이
+//         안정되지 않아 어른거림이 남는다.
+//
+//   프레임 인덱스는 _Time.y(초)를 60 배 해서 만든다. URP 포팅판에는
+//   HDRP 의 _AccumulationFrameIndex 같은 프레임 카운터가 없다.
+//   실제 프레임률과 정확히 일치할 필요는 없다 — 프레임마다 값이 다르게
+//   증가하기만 하면 수열 회전 목적은 달성된다.
 float GenerateRandomFloat(float2 screenUV)
 {
-    float time = unity_DeltaTime.y * _Time.y + _Seed;
-    _Seed += 1.0;
-    return GenerateHashedRandomFloat(uint3(screenUV * _ScreenSize.xy, time));
+    // R2 수열의 두 계수. 무리수라 어떤 주기에도 안 맞아떨어져서 격자
+    // 무늬가 생기지 않는다 (플라스틱 상수 1.32471795... 의 역수 거듭제곱).
+    const float2 R2 = float2(0.7548776662, 0.5698402909);
+
+    // 황금비의 소수부. 프레임 간 회전량으로 쓴다.
+    const float GOLDEN = 0.6180339887;
+
+    float2 pixelCoord = screenUV * _ScreenSize.xy;
+    float frameIndex = floor(_Time.y * 60.0) + _Seed;
+
+    return frac(dot(pixelCoord, R2) + frameIndex * GOLDEN);
 }
 
 // Returns the closest hit in X and the farthest hit in Y.

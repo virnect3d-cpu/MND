@@ -115,6 +115,47 @@ Shader "Hidden/Sky/VolumetricClouds"
                 // If the current pixel is sky
                 float depth = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV, 0).r;
 
+                // [여의도63 수정] 얇은 지오메트리 위로 구름이 새는 것을 막는다.
+                //
+                //   증상: 안테나 탑(격자 구조) 위로 구름이 덮였다. 탑 꼭대기는
+                //   27.6m 이고 구름층은 250~370m 라 물리적으로 불가능한데도
+                //   탑 안쪽 픽셀의 4~5% 가 구름 색으로 오염됐다.
+                //
+                //   원인: 이 패스는 resolutionScale 0.5 로 도는데 깊이는
+                //   point sampler 로 한 점만 읽는다. 저해상도 픽셀 하나가
+                //   화면 2x2 를 담당하므로, 그 한 점이 탑 격자 링 사이
+                //   빈틈(=하늘, far clip)에 걸리면 2x2 전체가 "가림 없음" 이
+                //   되고 maxRayLength 가 스카이박스 거리로 튄다. 그러면
+                //   구름이 링 위까지 칠해진다.
+                //
+                //   설정으로는 못 고쳤다. 해상도 0.5->1.0 (4.78%->4.24%),
+                //   업스케일 Bilinear->Bilateral, 시간누적 0.95->0,
+                //   MSAA 4x->1x (2.78%->2.53%) 전부 거의 그대로였다.
+                //
+                //   해법: 담당 영역의 깊이를 모두 읽어 가장 "가까운" 값을
+                //   쓴다. 하나라도 탑이면 그 픽셀은 가려진 것으로 친다.
+                //   보수적으로 가리는 쪽이라 구름이 새지 않는다.
+                //   역방향 Z 에서는 깊이값이 클수록 가까우므로 max 가 최근접이다.
+                {
+                    // 텍셀 크기는 깊이 텍스처에 직접 물어본다.
+                    //   _ScreenParams 는 지금 그리는 대상(절반 해상도) 기준이라
+                    //   그대로 쓰면 텍셀이 두 배가 되어 엉뚱한 데를 읽는다.
+                    //   _CameraDepthTexture_TexelSize 는 이 패스에서 선언되지
+                    //   않는다. GetDimensions 가 유일하게 확실한 방법이다.
+                    float dw, dh;
+                    _CameraDepthTexture.GetDimensions(dw, dh);
+                    float2 texel = float2(1.0 / dw, 1.0 / dh);
+                    float d0 = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV + float2(-0.5, -0.5) * texel, 0).r;
+                    float d1 = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV + float2( 0.5, -0.5) * texel, 0).r;
+                    float d2 = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV + float2(-0.5,  0.5) * texel, 0).r;
+                    float d3 = SAMPLE_TEXTURE2D_X_LOD(_CameraDepthTexture, s_point_clamp_sampler, screenUV + float2( 0.5,  0.5) * texel, 0).r;
+                #if UNITY_REVERSED_Z
+                    depth = max(depth, max(max(d0, d1), max(d2, d3)));
+                #else
+                    depth = min(depth, min(min(d0, d1), min(d2, d3)));
+                #endif
+                }
+
                 // It seems that some developers use shader graph to create the skybox, but cannot disable depth write due to Unity (shader graph) issue
                 // For better compatibility with different skybox shaders, we add a depth comparision threshold
                 bool isOccluded = abs(depth - UNITY_RAW_FAR_CLIP_VALUE) > RAW_FAR_CLIP_THRESHOLD;

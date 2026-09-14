@@ -17,6 +17,42 @@ public static class RunFixAndCapture
     const string SplitFlag = "Temp/yeouido63_split.flag";
     const string ScoreFlag = "Temp/yeouido63_score.flag";
     const string StepFlag = "Temp/yeouido63_step.flag";
+    const string OrderFlag = "Temp/yeouido63_order.flag";
+    const string LeakFlag = "Temp/yeouido63_leak.flag";
+    const string MsaaFlag = "Temp/yeouido63_msaa.flag";
+
+    [DidReloadScripts]
+    static void OnMsaa()
+    {
+        if (!File.Exists(MsaaFlag)) return;
+        EditorApplication.delayCall += () =>
+        {
+            try { File.Delete(MsaaFlag); ProbeLeakMsaa.Run(); }
+            catch (System.Exception e) { Debug.LogError("[MSAA] 실패: " + e); }
+        };
+    }
+
+    [DidReloadScripts]
+    static void OnLeak()
+    {
+        if (!File.Exists(LeakFlag)) return;
+        EditorApplication.delayCall += () =>
+        {
+            try { File.Delete(LeakFlag); ProbeOrderFix.Run(); }
+            catch (System.Exception e) { Debug.LogError("[누수] 실패: " + e); }
+        };
+    }
+
+    [DidReloadScripts]
+    static void OnOrder()
+    {
+        if (!File.Exists(OrderFlag)) return;
+        EditorApplication.delayCall += () =>
+        {
+            try { File.Delete(OrderFlag); ProbeCloudOrder.Run(); }
+            catch (System.Exception e) { Debug.LogError("[순서] 실패: " + e); }
+        };
+    }
 
     [DidReloadScripts]
     static void OnStep()
@@ -135,4 +171,4 @@ public static class RunFixAndCapture
         };
     }
 }
-// touch 1789342604
+// touch 1789345450

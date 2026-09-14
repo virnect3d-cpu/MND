@@ -4,6 +4,11 @@
 업스트림을 갱신할 때 충돌한다. 이 씬에 맞춘 설정은 전부
 `Assets/yeouido63/Editor/SetupVolumetrics.cs` 에 있다.
 
+> **예외 1건 — 로컬 패치가 들어가 있다.**
+> `VolumetricClouds.shader` 의 깊이 샘플링을 한 곳 고쳤다. 설정으로는
+> 못 고치는 업스트림 버그라 어쩔 수 없었다. 아래 "로컬 패치" 절을 보고,
+> 업스트림을 갱신하면 반드시 다시 적용해라.
+
 ## UnityVolumetricCloudsURP
 
 - 출처: https://github.com/jiaozi158/UnityVolumetricCloudsURP
@@ -28,10 +33,69 @@ HDRP 의 볼류메트릭 구름을 URP 로 포팅한 것. 레포는 URP 14 기�
 
 - `PC_Renderer` 에 `VolumetricCloudsURP` 렌더러 피처
 - `Yeouido63_Post.asset` 에 `Sky/Volumetric Clouds (URP)` 오버라이드
-- `state = Enabled`, `densityMultiplier = 0.22`, `globalSpeed = 2.5`
+- `state = Enabled`, `densityMultiplier = 0.06`, `globalSpeed = 0.04`
+- `bottomAltitude = 250`, `altitudeRange = 120`, `numPrimarySteps = 48`
 
-밀도를 기본값(0.4)이 아니라 0.22 로 낮춘 이유 — 이 씬은 항공 시점이라
-기본 밀도면 구름이 화면을 덮는다.
+밀도는 기본값(0.4)에서 계속 내려왔다. 0.22 -> 0.14 -> 0.06 이다.
+카메라 포스트프로세싱이 꺼져 있어서 한동안 화면에 안 나왔고, 켜고 보니
+하늘 전체에 옅은 베일처럼 덮여 스카이박스 구름 디테일까지 뭉갰다.
 
-구름 바닥 고도는 기본값 1200m 를 그대로 뒀다. 63빌딩이 250m 라 구름이
-한참 위에 뜨는데, 실제 적운 운저가 그 정도라 맞는 그림이다.
+`numPrimarySteps` 는 기본 32 도 24 도 부족했다. 24 에서는 구름 가장자리가
+스프레이 뿌린 것처럼 점 무늬로 부서진다 — 레이마칭 간격이 밀도 변화를
+못 따라가서 생기는 표본 부족이다. 24/32/40/48 을 훑어 48 부터 깨끗했다.
+
+시점은 항공이 아니라 옥상 눈높이다(카메라 y=1.75m). 예전 주석이
+항공 시점 기준이었는데, 그건 지금 비활성인 `CAM_63_Air` 얘기다.
+
+## 로컬 패치 — 얇은 지오메트리 위 구름 누수
+
+**파일**: `VolumetricClouds.shader`, Pass 0 "Volumetric Clouds" 의 `frag`
+(`_CameraDepthTexture` 를 읽는 곳, 검색어 `[여의도63 수정]`)
+
+### 증상
+
+안테나 탑(격자 구조) 위로 구름이 덮였다. 탑 꼭대기는 27.6m 이고 구름층은
+250~370m 라 구름이 탑 앞에 올 방법이 물리적으로 없는데도, 탑 안쪽 픽셀의
+4~5% 가 구름 색으로 오염됐다. 링 하나하나가 뿌옇게 먹혀 실루엣이 뭉갰다.
+
+### 원인
+
+이 패스는 `resolutionScale` 0.5 로 도는데 깊이는 point sampler 로 **한 점만**
+읽는다. 저해상도 픽셀 하나가 화면 2x2 를 담당하므로, 그 한 점이 격자 링 사이
+빈틈(= 하늘, far clip)에 걸리면 2x2 전체가 `isOccluded = false` 가 되고
+`maxRayLength` 가 스카이박스 거리(200000)로 튄다. 그러면 구름이 링 위까지
+칠해진다.
+
+### 설정으로는 못 고친다 — 다 시험했다
+
+| 시도 | 누수율 |
+|---|---|
+| 기준 (0.5, Bilinear, 시간누적 0.95, MSAA 4x) | 4.46% |
+| resolutionScale 0.5 -> 1.0 | 4.24% |
+| upscaleMode Bilinear -> Bilateral | 4.21% |
+| temporalAccumulationFactor 0.95 -> 0 | 변화 없음 |
+| MSAA 4x -> 1x | 2.53% |
+| **셰이더 패치 적용** | **0.32%** |
+
+해상도를 두 배로 올려도 거의 안 줄었다. 원인이 구름을 그리는 해상도가
+아니라 깊이를 한 점만 읽는 것이기 때문이다.
+
+### 패치 내용
+
+담당 영역 2x2 의 깊이를 모두 읽어 **가장 가까운 값**을 쓴다. 하나라도 탑이면
+그 픽셀은 가려진 것으로 친다. 보수적으로 가리는 쪽이라 구름이 새지 않는다.
+역방향 Z 에서는 값이 클수록 가까우므로 `max` 가 최근접이다.
+
+텍셀 크기는 `_CameraDepthTexture.GetDimensions` 로 직접 구한다.
+`_ScreenParams` 는 지금 그리는 대상(절반 해상도) 기준이라 쓰면 안 되고,
+`_CameraDepthTexture_TexelSize` 는 이 패스에서 선언되지 않는다.
+
+### 비용
+
+깊이 샘플이 픽셀당 1 -> 5 회로 는다. 절반 해상도라 전체 화면의 1/4 픽셀에서만
+돌고, 깊이 텍스처는 캐시에 잘 남는 편이라 체감 비용은 작다. 실측은 안 했다.
+
+### 검증 방법
+
+`Tools/Yeouido 63/구름 순서 판정` (`ProbeCloudOrder.cs`) 을 돌리면 누수율이
+숫자로 나온다. 2% 아래면 정상이다.

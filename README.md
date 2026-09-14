@@ -92,3 +92,30 @@ git lfs install
 ```
 
 LFS 도입 이전 시점은 `prelfs/main`, `prelfs/feat` 태그로 남겨 뒀다.
+
+## 라이선스
+
+**이 저장소는 상업적 사용을 금지한다.**
+
+여의도 63 도시 에셋(`Assets/yeouido63/`)을 비롯한 이 저장소의 결과물은
+VIRNECT 의 자산이다. 사내 검토·연구·시연 목적으로만 쓴다.
+아래 행위는 별도 서면 허가 없이는 안 된다.
+
+- 상업적 목적의 사용·판매·재배포
+- 외부 공개 제품·서비스에 포함
+- 에셋 스토어를 비롯한 마켓 업로드
+- 제3자에게 전달하거나 공개 저장소에 다시 올리기
+
+실측 도시 모델과 파사드 사진은 실제 지역·건물을 대상으로 한다.
+외부에 내보낼 일이 생기면 저작권과 초상·재산권을 먼저 확인해라.
+
+### 서드파티
+
+`Assets/VolumetricClouds/` 는 여기서 제외된다.
+[UnityVolumetricCloudsURP](https://github.com/jiaozi158/UnityVolumetricCloudsURP)
+(Copyright (c) 2024 jiaozi158) 를 가져온 것으로 **MIT 라이선스**다.
+MIT 는 상업적 사용을 허용하며, 이 저장소의 정책이 그 권리를 제한하지 않는다.
+다만 재배포할 때 원본 저작권 표시를 같이 넣어야 한다 —
+전문은 `Assets/VolumetricClouds/LICENSE.md` 에 있다.
+
+Unity 엔진과 URP 등 공식 패키지는 각자의 Unity 라이선스를 따른다.

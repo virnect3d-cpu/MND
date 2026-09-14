@@ -22,8 +22,8 @@ using UnityEngine.Rendering;
 
 public static class TuneAtmosphere
 {
-    const string PostPath = "Assets/yeouido63/Scenes/Yeouido63_Post.asset";
-    const string FogMat   = "Assets/yeouido63/Runtime/Fog/M_VolumetricFog.mat";
+    const string PostPath = Yeouido63Paths.Post;
+    const string FogMat   = Yeouido63Paths.FogMat;
 
     // 0.14 는 하늘을 통째로 덮었다. 볼륨감만 남기는 선.
     public const float CloudDensity = 0.06f;

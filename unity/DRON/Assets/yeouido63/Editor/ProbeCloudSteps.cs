@@ -28,8 +28,8 @@ using UnityEngine.Rendering;
 
 public static class ProbeCloudSteps
 {
-    const string PostPath = "Assets/yeouido63/Scenes/Yeouido63_Post.asset";
-    const string OutDir   = "Temp/Captures";
+    const string PostPath = Yeouido63Paths.Post;
+    const string OutDir   = Yeouido63Paths.CaptureDir;
     const int    W = 1280, H = 720;
     const float  ZoomFov = 14f;
 

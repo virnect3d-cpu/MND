@@ -21,8 +21,7 @@ using UnityEngine;
 
 public static class CaptureWindPair
 {
-    const string Flag = "Temp/yeouido63_windpair.flag";
-    const string OutDir = "Temp/Captures";
+    const string OutDir = Yeouido63Paths.CaptureDir;
 
     // 두 컷의 시간 간격.
     //
@@ -36,14 +35,7 @@ public static class CaptureWindPair
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[바람검증] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("windpair", "바람캡처", CaptureWindPair.Run);
 
     [MenuItem("Tools/Yeouido 63/바람 검증 캡처")]
     public static void Run()

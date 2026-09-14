@@ -9,7 +9,6 @@
 //   에디터 통계라 빌드와 정확히 같지는 않다. 절대값보다 "무엇이 지배적인가"
 //   를 보는 용도다.
 
-using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEditor;
@@ -19,18 +18,10 @@ using UnityEngine.Rendering;
 
 public static class ProfileScene
 {
-    const string Flag = "Temp/yeouido63_profile.flag";
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[성능] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("profile", "성능", ProfileScene.Run);
 
     [MenuItem("Tools/Yeouido 63/성능 측정")]
     public static void Run()
@@ -115,6 +106,50 @@ public static class ProfileScene
         var urp = GraphicsSettings.currentRenderPipeline;
         sb.AppendLine($"  파이프라인: {(urp == null ? "내장" : urp.name)}");
 
+        CheckVolumeClamps(sb);
+
         Debug.Log(sb.ToString());
+    }
+
+    // VolumeParameter 의 min/max 는 [NonSerialized] 라 에셋에서 복원될 때
+    // 0 으로 남을 수 있다. 그러면 ClampedFloatParameter(0,1) 짜리가 max=0 이
+    // 되어 짙기와 속도를 통째로 0 으로 삼킨다 — 구름이 사라지는데 로그는
+    // 안 남는 종류의 사고다.
+    //
+    //   지금 프로파일에서는 정상으로 나온다(전용 검증 스크립트로 확인했다).
+    //   그래도 남겨 둔 건 에셋을 다시 만들 때 재발할 수 있어서다. 성능
+    //   측정에 얹어 두면 따로 실행할 이유 없이 매번 같이 찍힌다.
+    static void CheckVolumeClamps(StringBuilder sb)
+    {
+        var post = AssetDatabase.LoadAssetAtPath<VolumeProfile>(Yeouido63Paths.Post);
+        if (post == null) { sb.AppendLine("프로파일 없음"); return; }
+
+        VolumeComponent clouds = null;
+        foreach (var c in post.components)
+            if (c != null && c.GetType().Name == "VolumetricClouds") { clouds = c; break; }
+        if (clouds == null) { sb.AppendLine("구름 오버라이드 없음"); return; }
+
+        sb.AppendLine("=== VolumeParameter min/max 복원 확인 ===");
+        foreach (var name in new[] { "globalOrientation", "densityMultiplier",
+                                     "shapeSpeedMultiplier", "erosionSpeedMultiplier",
+                                     "bottomAltitude", "altitudeRange" })
+        {
+            var fi = clouds.GetType().GetField(name);
+            if (fi == null) { sb.AppendLine($"  {name}: 필드 없음"); continue; }
+
+            switch (fi.GetValue(clouds))
+            {
+                case ClampedFloatParameter cp:
+                    sb.AppendLine($"  {name}: Clamped[{cp.min}, {cp.max}] = {cp.value}" +
+                                  (cp.max == 0f ? "   <-- max=0, 값이 삼켜진다!" : ""));
+                    break;
+                case MinFloatParameter mp:
+                    sb.AppendLine($"  {name}: Min[{mp.min}] = {mp.value}");
+                    break;
+                case var other:
+                    sb.AppendLine($"  {name}: {other?.GetType().Name}");
+                    break;
+            }
+        }
     }
 }

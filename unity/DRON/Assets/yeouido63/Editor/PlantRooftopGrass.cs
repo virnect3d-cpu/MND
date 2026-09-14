@@ -36,25 +36,21 @@ using UnityEngine;
 
 public static class PlantRooftopGrass
 {
-    // 외부에서 유니티를 조작할 수단이 없을 때 쓰는 자동 실행 플래그.
-    // Yeouido63AutoRun 의 플래그(yeouido63_run.flag)와 반드시 달라야 한다 —
-    // 그쪽은 씬을 새로 만들어버린다.
-    const string Flag = "Temp/yeouido63_grass.flag";
-
+    // 자동 실행 플래그는 "grass" 다. Yeouido63AutoRun 의 "run" 과 반드시
+    // 달라야 한다 — 그쪽은 씬을 새로 만들어버린다.
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
+        => AutoRunFlag.Consume("grass", "잔디", () =>
         {
-            try { File.Delete(Flag); _silent = true; Plant(); }
-            catch (System.Exception e) { Debug.LogError("[잔디] 자동 실행 실패: " + e); }
+            // 자동 실행일 때는 중간 로그를 줄인다. 심는 과정이 배치마다
+            // 한 줄씩 찍혀서 정작 결과가 묻힌다.
+            _silent = true;
+            try { Plant(); }
             finally { _silent = false; }
-        };
-    }
+        }, exitPlay: true);
 
     const string GrassRoot   = "GRASS_Helipad";
-    const string TexDir      = "Assets/yeouido63/Runtime/Textures/Grass";
+    const string TexDir      = Yeouido63Paths.GrassDir;
     const string MaskPath    = TexDir + "/Grass_Placement_Mask.png";
     const string MatPath     = TexDir + "/M_GrassBlades.mat";
     const string MeshPath    = TexDir + "/GrassClump.asset";

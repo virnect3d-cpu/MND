@@ -11,26 +11,17 @@
 //   로테이터는 원본을 직접 돌리는 방식으로 고쳤다. 이 스크립트는 이미
 //   비어 버린 참조를 되돌리는 용도다.
 
-using System.IO;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine;
 
 public static class FixSkybox
 {
-    const string Flag    = "Temp/yeouido63_fixsky.flag";
-    const string SkyPath = "Assets/yeouido63/Runtime/HDRI/Sky_Yeouido.mat";
+    const string SkyPath = Yeouido63Paths.RuntimeDir + "/HDRI/Sky_Yeouido.mat";
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[하늘] 복구 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("fixsky", "스카이박스", FixSkybox.Run, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/스카이박스 복구")]
     public static void Run()

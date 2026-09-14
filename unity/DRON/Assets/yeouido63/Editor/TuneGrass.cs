@@ -33,7 +33,6 @@ using UnityEngine;
 
 public static class TuneGrass
 {
-    const string Flag = "Temp/yeouido63_tunegrass.flag";
 
     // 이미 한 번 0.5 배로 줄였다. 다시 돌려도 더 줄지 않게 1 로 둔다.
     // 더 줄이고 싶으면 이 값을 바꿔서 재실행하면 된다.
@@ -50,17 +49,10 @@ public static class TuneGrass
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[잔디튠] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("tunegrass", "잔디튜닝", TuneGrass.Run, exitPlay: true);
 
     // 잔디판을 칠한 옥상 아틀라스. 디스크에서 직접 고치므로 강제 리임포트가 필요하다.
-    const string Atlas = "Assets/yeouido63/Runtime/Models/63_RoofTop/Roof_Top_blinn2_BaseColor.png";
+    const string Atlas = Yeouido63Paths.RuntimeDir + "/Models/63_RoofTop/Roof_Top_blinn2_BaseColor.png";
 
     [MenuItem("Tools/Yeouido 63/잔디 잎 크기·색 조정")]
     public static void Run()

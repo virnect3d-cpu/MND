@@ -46,9 +46,8 @@ using UnityEngine;
 
 public static class SetupDustParticles
 {
-    const string Flag     = "Temp/yeouido63_dustfx.flag";
     const string RootName = "DUST_Particles";
-    const string TexDir   = "Assets/yeouido63/Runtime/Textures/Dust";
+    const string TexDir   = Yeouido63Paths.DustDir;
     const string TexPath  = TexDir + "/DustParticle.png";
     const string SoftPath = TexDir + "/DustSoft.png";
     const string MatPath  = TexDir + "/M_DustParticle.mat";
@@ -73,14 +72,7 @@ public static class SetupDustParticles
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Setup(); }
-            catch (System.Exception e) { Debug.LogError("[먼지] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("dustfx", "먼지", SetupDustParticles.Setup, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/먼지 파티클 심기")]
     public static void Setup()

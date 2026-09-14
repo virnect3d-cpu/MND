@@ -34,8 +34,6 @@
 //   씬에 이미 Linear 안개(100~4200m)가 있다. 둘이 겹치면 과하게 뿌예지므로
 //   기존 안개 밀도를 낮춘다.
 
-using System.IO;
-using System.Linq;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine;
@@ -43,22 +41,14 @@ using UnityEngine.Rendering;
 
 public static class OptimizeAndDust
 {
-    const string Flag       = "Temp/yeouido63_opt.flag";
-    const string RPAssetPath = "Assets/Settings/PC_RPAsset.asset";
-    const string RendererPath = "Assets/Settings/PC_Renderer.asset";
-    const string FogMatPath  = "Assets/yeouido63/Runtime/Fog/M_VolumetricFog.mat";
-    const string PostPath    = "Assets/yeouido63/Scenes/Yeouido63_Post.asset";
+    const string RPAssetPath = Yeouido63Paths.RPAsset;
+    const string RendererPath = Yeouido63Paths.Renderer;
+    const string FogMatPath  = Yeouido63Paths.FogMat;
+    const string PostPath    = Yeouido63Paths.Post;
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[최적화] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("opt", "최적화", OptimizeAndDust.Run, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/최적화 + 황사")]
     public static void Run()
@@ -253,7 +243,7 @@ public static class OptimizeAndDust
         // 3D 노이즈가 안 물려 있으면 안개가 균일한 판이 된다
         if (mat.HasProperty("_FogNoise") && mat.GetTexture("_FogNoise") == null)
         {
-            var n = AssetDatabase.LoadAssetAtPath<Texture>("Assets/yeouido63/Runtime/Fog/FogNoise3D.asset");
+            var n = AssetDatabase.LoadAssetAtPath<Texture>(Yeouido63Paths.FogDir + "/FogNoise3D.asset");
             if (n != null) { mat.SetTexture("_FogNoise", n); Debug.Log("[황사] 3D 노이즈 연결"); }
             else Debug.LogWarning("[황사] FogNoise3D.asset 을 못 찾았다 — 안개가 균일해진다.");
         }

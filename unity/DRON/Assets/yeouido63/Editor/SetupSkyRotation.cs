@@ -10,26 +10,17 @@
 //   배경 HDRI 는 화면 전체를 덮으니 조금만 돌아도 눈에 들어온다.
 //   그쪽을 살살 돌리는 편이 훨씬 효율적이다.
 
-using System.IO;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine;
 
 public static class SetupSkyRotation
 {
-    const string Flag = "Temp/yeouido63_skyrot.flag";
     const string HostName = "SKY_Rotator";
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[하늘] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("skyrot", "하늘", SetupSkyRotation.Run, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/하늘 자전 켜기")]
     public static void Run()

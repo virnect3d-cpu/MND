@@ -35,8 +35,7 @@ using UnityEngine.Rendering.Universal;
 
 public static class SetupVolumetrics
 {
-    const string Flag       = "Temp/yeouido63_volumetric.flag";
-    const string FogDir     = "Assets/yeouido63/Runtime/Fog";
+    const string FogDir     = Yeouido63Paths.FogDir;
     const string NoisePath  = FogDir + "/FogNoise3D.asset";
     const string FogMatPath = FogDir + "/M_VolumetricFog.mat";
     const string FogShader  = "Yeouido63/VolumetricFog";
@@ -44,14 +43,7 @@ public static class SetupVolumetrics
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[볼류메트릭] 자동 실행 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("volumetric", "볼류메트릭", SetupVolumetrics.Run, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/볼류메트릭 셋업")]
     public static void Run()

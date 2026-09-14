@@ -21,7 +21,6 @@
 //   잡는다. 프로브는 월드 축 정렬이라 옥상이 -91.9도 회전해 있어도 상관없다 —
 //   박스만 충분히 크면 된다.
 
-using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Callbacks;
@@ -35,18 +34,10 @@ public static class SetupReflectionProbe
     // ("probe" 가 ReflectionProbe 와 ProbeClouds 양쪽을 뜻해서다).
     // 같은 파일을 두 훅이 보는 바람에, 구름 측정 하나 하려고 플래그를
     // 놓으면 라이트맵 베이크가 같이 시작될 수 있었다. 이름을 갈랐다.
-    const string Flag = "Temp/yeouido63_refprobe.flag";
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Setup(); Bake(); }
-            catch (System.Exception e) { Debug.LogError("[프로브] 자동 실행 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("refprobe", "프로브", SetupReflectionProbe.Setup, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/리플렉션 프로브 굽기")]
     public static void Setup()

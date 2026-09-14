@@ -7,7 +7,6 @@
 // 프로파일의 현재 값을 그대로 끌어와 초기 상태를 맞춘다.
 // (임의의 기본값으로 덮어쓰면 지금 보이는 하늘이 바뀌어 버린다.)
 
-using System.IO;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEditor.SceneManagement;
@@ -16,8 +15,7 @@ using UnityEngine.Rendering;
 
 public static class SetupCloudHandle
 {
-    const string Flag     = "Temp/yeouido63_cloudhandle.flag";
-    const string PostPath = "Assets/yeouido63/Scenes/Yeouido63_Post.asset";
+    const string PostPath = Yeouido63Paths.Post;
     const string ObjName  = "CLOUD_Layer";
 
     // 구름 덩어리가 흘러가는 속도(m/s).
@@ -69,14 +67,7 @@ public static class SetupCloudHandle
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[구름] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("cloudhandle", "구름", SetupCloudHandle.Run, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/구름 레이어 오브젝트 만들기")]
     public static void Run()

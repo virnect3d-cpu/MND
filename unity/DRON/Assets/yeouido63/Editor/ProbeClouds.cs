@@ -18,8 +18,8 @@ using UnityEngine.Rendering;
 
 public static class ProbeClouds
 {
-    const string PostPath = "Assets/yeouido63/Scenes/Yeouido63_Post.asset";
-    const string OutDir   = "Temp/Captures";
+    const string PostPath = Yeouido63Paths.Post;
+    const string OutDir   = Yeouido63Paths.CaptureDir;
 
     [MenuItem("Tools/Yeouido 63/구름 기여 확인")]
     public static void Run()

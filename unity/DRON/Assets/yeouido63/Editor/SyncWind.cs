@@ -23,7 +23,6 @@
 //   WindAngleDeg 한 곳에서 정한다. 구름의 globalOrientation 은 도 단위인데
 //   기준축이 달라(나침반식) 그대로 넣으면 안 된다 — 아래 주석 참고.
 
-using System.IO;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine;
@@ -31,10 +30,9 @@ using UnityEngine.Rendering;
 
 public static class SyncWind
 {
-    const string Flag     = "Temp/yeouido63_syncwind.flag";
-    const string GrassMat = "Assets/yeouido63/Runtime/Textures/Grass/M_GrassBlades.mat";
-    const string FogMat   = "Assets/yeouido63/Runtime/Fog/M_VolumetricFog.mat";
-    const string PostPath = "Assets/yeouido63/Scenes/Yeouido63_Post.asset";
+    const string GrassMat = Yeouido63Paths.GrassMat;
+    const string FogMat   = Yeouido63Paths.FogMat;
+    const string PostPath = Yeouido63Paths.Post;
 
     // 바람 방향 — XZ 평면 각도. 0 도면 순수 +X, 90 도면 순수 +Z 다.
     //
@@ -72,14 +70,7 @@ public static class SyncWind
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Run(); }
-            catch (System.Exception e) { Debug.LogError("[바람] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("syncwind", "바람", SyncWind.Run, exitPlay: true);
 
     [MenuItem("Tools/Yeouido 63/바람 동기화")]
     public static void Run()

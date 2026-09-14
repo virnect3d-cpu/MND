@@ -24,7 +24,7 @@ using UnityEngine;
 
 public class WindAnglePicker : EditorWindow
 {
-    const string SyncPath = "Assets/yeouido63/Editor/SyncWind.cs";
+    const string SyncPath = Yeouido63Paths.Root + "/Editor/SyncWind.cs";
 
     float _angle = SyncWind.Angle;
     bool  _live  = true;

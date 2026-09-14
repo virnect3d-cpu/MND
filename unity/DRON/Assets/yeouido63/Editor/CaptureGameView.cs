@@ -19,19 +19,11 @@ using UnityEngine;
 
 public static class CaptureGameView
 {
-    const string Flag = "Temp/yeouido63_capture.flag";
-    const string OutDir = "Temp/Captures";
+    const string OutDir = Yeouido63Paths.CaptureDir;
 
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        EditorApplication.delayCall += () =>
-        {
-            try { File.Delete(Flag); Capture(); }
-            catch (System.Exception e) { Debug.LogError("[캡처] 실패: " + e); }
-        };
-    }
+        => AutoRunFlag.Consume("capture", "캡처", CaptureGameView.Capture);
 
     [MenuItem("Tools/Yeouido 63/화면 캡처")]
     public static void Capture() { Capture("gameview"); }

@@ -19,41 +19,25 @@
 //   Setup() 쪽에 확인 대화상자를 넣어 뒀지만, 그건 사람이 보고 있을 때만
 //   막아 준다. 배치 모드(-batchmode)나 대화상자를 못 띄우는 상황에서는
 //   그냥 진행된다. 이 플래그는 새 씬을 만들 의도가 있을 때만 만들어라.
+//
+//   그래서 플래그를 만드는 메뉴 항목은 뺐다. 예전엔
+//   `Tools/Yeouido 63/자동 실행 플래그 만들기` 가 있었는데, 이름만 봐서는
+//   "다음 리컴파일에 씬이 날아간다" 를 알 수 없어서 실수로 누를 경로가
+//   됐다. 정말 필요하면 파일을 손으로 만들어라 —
+//   그 한 단계가 의도를 확인하는 문턱 역할을 한다.
+//
+//     bash:  touch Temp/yeouido63_run.flag
 
-using System.IO;
-using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEngine;
 
 public static class Yeouido63AutoRun
 {
-    const string Flag = "Temp/yeouido63_run.flag";
-
     [DidReloadScripts]
     static void OnReload()
-    {
-        if (!File.Exists(Flag)) return;
-        // 컴파일 직후엔 에셋 DB 가 아직 정리 중이라 한 프레임 미룬다
-        EditorApplication.delayCall += () =>
+        => AutoRunFlag.Consume("run", "Yeouido63", () =>
         {
-            try
-            {
-                File.Delete(Flag);      // 먼저 지워서 실패해도 무한 반복은 막는다
-                Debug.Log("[Yeouido63] 플래그 감지 -> 씬 셋업 자동 실행");
-                SetupYeouido63.Setup();
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError("[Yeouido63] 자동 실행 실패: " + e);
-            }
-        };
-    }
-
-    [MenuItem("Tools/Yeouido 63/자동 실행 플래그 만들기")]
-    static void MakeFlag()
-    {
-        Directory.CreateDirectory("Temp");
-        File.WriteAllText(Flag, "run");
-        Debug.Log("[Yeouido63] 플래그 생성: " + Flag);
-    }
+            Debug.Log("[Yeouido63] 플래그 감지 -> 씬 셋업 자동 실행");
+            SetupYeouido63.Setup();
+        }, exitPlay: true);
 }

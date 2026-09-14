@@ -34,10 +34,20 @@
 # 주의: 아래 규칙은 이 커밋 이후 버전에만 적용된다. 이전 커밋에 들어간
 # blob 은 그대로 남으므로, 저장소 용량을 소급해서 줄이려면
 # `git lfs migrate import` 로 히스토리를 재작성해야 한다.
-unity/DRON/Assets/yeouido63/**/*.fbx filter=lfs diff=lfs merge=lfs -text
-unity/DRON/Assets/yeouido63/**/*.hdr filter=lfs diff=lfs merge=lfs -text
-unity/DRON/Assets/yeouido63/**/*.exr filter=lfs diff=lfs merge=lfs -text
-unity/DRON/Assets/yeouido63/**/*.png filter=lfs diff=lfs merge=lfs -text
-unity/DRON/Assets/yeouido63/**/*.jpg filter=lfs diff=lfs merge=lfs -text
-unity/DRON/Assets/yeouido63/**/*.tga filter=lfs diff=lfs merge=lfs -text
-unity/DRON/Assets/yeouido63/**/*.psd filter=lfs diff=lfs merge=lfs -text
+# 경로를 yeouido63 으로 제한하지 않는다. 예전엔 그 폴더에만 걸어 뒀는데,
+# 다른 폴더에 에셋을 넣으면 그대로 새는 구조였다. 실제로
+# Assets/VolumetricClouds/Textures/ 의 노이즈 텍스처 4 장(최대 1MB)이
+# LFS 를 안 타고 들어가 있었다. 확장자 기준으로 전역에 건다.
+*.fbx  filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+*.hdr  filter=lfs diff=lfs merge=lfs -text
+*.exr  filter=lfs diff=lfs merge=lfs -text
+*.png  filter=lfs diff=lfs merge=lfs -text
+*.jpg  filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.tga  filter=lfs diff=lfs merge=lfs -text
+*.psd  filter=lfs diff=lfs merge=lfs -text
+*.tif  filter=lfs diff=lfs merge=lfs -text
+*.wav  filter=lfs diff=lfs merge=lfs -text
+*.mp3  filter=lfs diff=lfs merge=lfs -text
+*.mp4  filter=lfs diff=lfs merge=lfs -text

@@ -197,7 +197,11 @@ public static class SetupDustParticles
     // 맞춘 값이라 유지한다. 여기에 크기 커브와 소프트 파티클만 더한다.
     static int BuildMid(GameObject root, Material mat)
     {
-        const int Count = 6000;
+        // 6000 -> 4800 (20% 감축). 화면에 알갱이가 너무 많았다.
+        // 수명·속도·크기는 그대로 두고 밀도만 낮춘다. 아래 rateOverTime 도
+        // 같은 비율로 내려야 실제로 줄어든다 — 상한만 깎으면 방출이 그대로라
+        // 계속 상한에 부딪혀서 개수가 안 준다.
+        const int Count = 4800;
         var go = NewSystem(root, "DUST_Mid", out var ps);
 
         var main = ps.main;
@@ -231,7 +235,8 @@ public static class SetupDustParticles
 
         var em = ps.emission;
         em.enabled = true;
-        em.rateOverTime = 2100f;
+        // 2100 -> 1680. Count 와 같은 20% 감축이다 (위 주석 참고).
+        em.rateOverTime = 1680f;
 
         var shape = ps.shape;
         shape.enabled = true;
@@ -310,7 +315,11 @@ public static class SetupDustParticles
     // 가리고 오버드로도 급증한다. 60 개로 충분히 읽힌다.
     static int BuildGrit(GameObject root, Material mat)
     {
-        const int Count = 60;
+        // 60 -> 48 (20% 감축). MID 와 같은 비율로 내린다.
+        // 이 층만 그대로 두면 코앞 티끌 비중이 상대적으로 늘어서, 전체를
+        // 줄였는데도 화면에서는 덜 줄어든 것처럼 보인다.
+        // rateOverTime 이 Count 기반이라 방출률은 자동으로 따라간다.
+        const int Count = 48;
         var go = NewSystem(root, "DUST_Grit", out var ps);
 
         var main = ps.main;

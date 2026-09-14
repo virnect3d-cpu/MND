@@ -220,8 +220,11 @@ public static class SetupDustParticles
         //   눈송이가 됐다(5m 에서 11~32px). 720p/FOV60 기준으로
         //     3~6px  = 알갱이로 읽힌다
         //     10px+  = 눈송이로 보인다
-        //   0.03~0.075m 면 5m 에서 3.7~9.4px 라 알갱이 영역이다.
-        main.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.075f);
+        //
+        //   0.03~0.075m 는 5m 에서 3.7~9.4px 인데, 상단 9.4px 가 눈송이
+        //   문턱에 거의 닿아서 큰 놈들이 눈처럼 보였다. 0.022~0.05m 로
+        //   내리면 2.7~6.2px 라 범위 전체가 알갱이 영역 안에 들어온다.
+        main.startSize = new ParticleSystem.MinMaxCurve(0.022f, 0.05f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
 
         // 색 — 누런 황사가 아니라 회색 먼지.
@@ -324,7 +327,9 @@ public static class SetupDustParticles
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.5f, 1.0f);
         main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 2f);
         // 가까우니 월드 크기는 작아도 화면에서는 크게 잡힌다.
-        main.startSize = new ParticleSystem.MinMaxCurve(0.012f, 0.045f);
+        // MID 를 내린 비율(약 0.67)만큼 같이 내린다. 이 층만 그대로 두면
+        // 코앞 티끌이 상대적으로 커져서 층 사이 크기 위계가 뒤집힌다.
+        main.startSize = new ParticleSystem.MinMaxCurve(0.008f, 0.03f);
         main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
         main.startColor = new ParticleSystem.MinMaxGradient(
             new Color(0.78f, 0.78f, 0.79f, 0.7f),

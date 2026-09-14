@@ -13,6 +13,68 @@ public static class RunFixAndCapture
     const string Flag = "Temp/yeouido63_fixcam.flag";
     const string ProbeFlag = "Temp/yeouido63_probe.flag";
     const string TuneFlag = "Temp/yeouido63_tune.flag";
+    const string EdgeFlag = "Temp/yeouido63_edge.flag";
+    const string SplitFlag = "Temp/yeouido63_split.flag";
+    const string ScoreFlag = "Temp/yeouido63_score.flag";
+    const string StepFlag = "Temp/yeouido63_step.flag";
+
+    [DidReloadScripts]
+    static void OnStep()
+    {
+        if (!File.Exists(StepFlag)) return;
+        EditorApplication.delayCall += () =>
+        {
+            try { File.Delete(StepFlag); ProbeCloudSteps.Run(); }
+            catch (System.Exception e) { Debug.LogError("[스텝] 실패: " + e); }
+        };
+    }
+
+    [DidReloadScripts]
+    static void OnScore()
+    {
+        if (!File.Exists(ScoreFlag)) return;
+        EditorApplication.delayCall += () =>
+        {
+            try { File.Delete(ScoreFlag); ScoreCloudFix.Run(); }
+            catch (System.Exception e) { Debug.LogError("[점수] 실패: " + e); }
+        };
+    }
+
+    // 구름 깨짐 원인 분리 (해상도 / 시간누적)
+    [DidReloadScripts]
+    static void OnSplit()
+    {
+        if (!File.Exists(SplitFlag)) return;
+        EditorApplication.delayCall += () =>
+        {
+            try { File.Delete(SplitFlag); ProbeCloudFix.Run(); }
+            catch (System.Exception e) { Debug.LogError("[분리] 실패: " + e); }
+        };
+    }
+
+    // 먼지 재배치 + 구름 경계 진단.
+    [DidReloadScripts]
+    static void OnEdge()
+    {
+        if (!File.Exists(EdgeFlag)) return;
+        EditorApplication.delayCall += () =>
+        {
+            try
+            {
+                File.Delete(EdgeFlag);
+                // 먼저 진단부터. SetupDustParticles 는 기존 먼지를 지웠다
+                // 다시 만드는데, 그 파괴가 같은 프레임에 섞이면 진단 쪽에서
+                // 죽은 오브젝트를 참조해 MissingReferenceException 이 난다.
+                ProbeCloudEdge.Run();
+                EditorApplication.delayCall += () =>
+                {
+                    SetupDustParticles.Setup();
+                    EditorApplication.delayCall += CaptureGameView.Capture;
+                };
+            }
+            catch (System.Exception e) { Debug.LogError("[경계] 실패: " + e); }
+        };
+    }
 
     [DidReloadScripts]
     static void OnProbe()

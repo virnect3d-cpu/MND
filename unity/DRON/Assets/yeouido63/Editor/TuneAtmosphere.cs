@@ -28,6 +28,22 @@ public static class TuneAtmosphere
     // 0.14 는 하늘을 통째로 덮었다. 볼륨감만 남기는 선.
     public const float CloudDensity = 0.06f;
 
+    // 주 스텝 수. 24 -> 48.
+    //
+    //   탑 주변 구름 가장자리가 스프레이 뿌린 것처럼 부서지는 문제가
+    //   있었다. 해상도(0.5->1.0), 업스케일 방식(Bilinear->Bilateral),
+    //   시간누적(0.95->0) 을 각각 꺼 봤지만 셋 다 가장자리가 그대로였다 —
+    //   같은 자리를 잘라 나란히 놓으니 구분이 안 갔다.
+    //
+    //   범인은 레이마칭 스텝 수였다. 24 는 구름 밀도가 변하는 속도를
+    //   못 따라가서 표본이 듬성듬성 잡히고, 그게 점 무늬로 보인다.
+    //   64 로 올리니 통째로 사라졌고, 24/32/40/48 을 훑어 보니 48 부터
+    //   깨끗했다.
+    //
+    //   resolutionScale 이 0.5 라 실제 비용은 전체 해상도 24 스텝의
+    //   절반 수준이다.
+    public const int CloudSteps = 48;
+
     // far clip 1000 안쪽. 100m 는 지평선 근처 여유로 남긴다.
     public const float FogMaxDistance = 900f;
 
@@ -48,18 +64,29 @@ public static class TuneAtmosphere
             if (c != null && c.GetType().Name == "VolumetricClouds") { clouds = c; break; }
         if (clouds == null) { Debug.LogError("[대기] 구름 오버라이드 없음"); return; }
 
-        var fi = clouds.GetType().GetField("densityMultiplier");
-        if (fi == null) { Debug.LogError("[대기] densityMultiplier 필드 없음"); return; }
-
-        if (fi.GetValue(clouds) is VolumeParameter<float> p)
+        if (clouds.GetType().GetField("densityMultiplier")?.GetValue(clouds)
+            is VolumeParameter<float> p)
         {
             float before = p.value;
             p.value = CloudDensity;
             p.overrideState = true;
-            EditorUtility.SetDirty(post);
             Debug.Log($"[대기] 구름 짙기 {before:F3} -> {p.value:F3}");
         }
-        else Debug.LogError("[대기] densityMultiplier 타입이 예상과 다르다");
+        else Debug.LogError("[대기] densityMultiplier 를 못 잡았다");
+
+        // 스텝 수를 반드시 오버라이드까지 켠다. 값만 쓰고 스위치가 꺼져
+        // 있으면 렌더러가 기본값을 쓴다 — 이 시스템에서 제일 흔한 함정이다.
+        if (clouds.GetType().GetField("numPrimarySteps")?.GetValue(clouds)
+            is VolumeParameter<int> s)
+        {
+            int before = s.value;
+            s.value = CloudSteps;
+            s.overrideState = true;
+            Debug.Log($"[대기] 구름 주스텝 {before} -> {s.value} (가장자리 부서짐 해결)");
+        }
+        else Debug.LogError("[대기] numPrimarySteps 를 못 잡았다");
+
+        EditorUtility.SetDirty(post);
     }
 
     static void TuneFog()

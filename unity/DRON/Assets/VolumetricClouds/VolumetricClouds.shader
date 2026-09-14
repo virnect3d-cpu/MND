@@ -414,11 +414,33 @@ Shader "Hidden/Sky/VolumetricClouds"
                 float4 prevClipPos = mul(_PrevViewProjMatrix, posWS);
                 float4 curClipPos = mul(_NonJitteredViewProjMatrix, posWS);
 
-                half2 prevPosCS = prevClipPos.xy / prevClipPos.w;
-                half2 curPosCS = curClipPos.xy / curClipPos.w;
+                // [여의도63 수정] 화면 좌표 계산을 float 로 올린다. 원본은 half 였다.
+                //
+                //   증상: 카메라가 움직일 때 구름에 픽셀 단위 "드르륵" 이
+                //   보인다. 부드럽게 미끄러지지 않고 한 칸씩 덜컥거린다.
+                //
+                //   원인: half 는 유효자릿수가 약 3 자리다. NDC 좌표
+                //   -1~1 구간에서 표현 간격이 대략 0.001 이고, 이걸 UV 로
+                //   바꾸면 1920 폭에서 픽셀 한두 개에 해당한다. 그래서
+                //   카메라가 연속적으로 움직여도 velocity 는 계단처럼 튄다.
+                //   히스토리를 읽는 자리가 픽셀 단위로 덜컥거리니 화면에서
+                //   드르륵으로 보인다.
+                //
+                //   그리고 여기서 하는 건 뺄셈이다. prevPosCS 와 curPosCS 가
+                //   거의 같은 값일 때 빼면 유효자릿수가 통째로 날아간다.
+                //   카메라가 느리게 움직일수록 두 값이 가까워지므로, 느린
+                //   이동에서 오히려 더 심해진다.
+                //
+                //   posWS / prevClipPos / curClipPos 는 이미 float 다. 나누기
+                //   결과만 half 로 받으면서 정밀도를 버리고 있었다.
+                //
+                //   비용: 이 패스의 좌표 연산 몇 줄만 float 가 된다. 컬러
+                //   (boxMin/boxMax/prevColor) 는 half 그대로라 대역폭은 안 변한다.
+                float2 prevPosCS = prevClipPos.xy / prevClipPos.w;
+                float2 curPosCS = curClipPos.xy / curClipPos.w;
 
                 // Backwards camera motion vectors
-                half2 velocity = (prevPosCS - curPosCS) * 0.5h;
+                float2 velocity = (prevPosCS - curPosCS) * 0.5;
             #if UNITY_UV_STARTS_AT_TOP
                 velocity.y = -velocity.y;
             #endif
@@ -438,7 +460,12 @@ Shader "Hidden/Sky/VolumetricClouds"
                 //prevColor.rgb = ClipToAABBCenter(prevColor.rgb, boxMin, boxMax);
                 prevColor.rgb = clamp(prevColor.rgb, boxMin, boxMax);
 
-                half intensity = saturate(min(_AccumulationFactor - (abs(velocity.x)) * _AccumulationFactor, _AccumulationFactor - (abs(velocity.y)) * _AccumulationFactor));
+                // 섞는 비율도 velocity 를 그대로 먹는다. 여기서 half 로
+                // 떨어뜨리면 위에서 올린 정밀도가 도로 계단이 되므로
+                // float 로 계산하고 마지막에만 half 로 내린다.
+                float accum = _AccumulationFactor;
+                half intensity = (half)saturate(min(accum - abs(velocity.x) * accum,
+                                                    accum - abs(velocity.y) * accum));
 
                 return half4(prevColor.rgb, intensity);
             }

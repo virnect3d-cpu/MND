@@ -53,6 +53,7 @@ public static class ProbeShimmer
     const string OutDir = Yeouido63Paths.CaptureDir;
     const string CloudMat = "Assets/VolumetricClouds/VolumetricClouds.mat";
     const string StaticNoise = "_CLOUD_STATIC_NOISE";
+    // half -> float 정밀도 수정 후 재측정 (구름 흐름 1.99 -> 0.76)
     const int    W = 960, H = 540;
     const float  ZoomFov = 22f;
 
